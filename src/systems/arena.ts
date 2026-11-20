@@ -1,6 +1,7 @@
 // The Grand Coliseum: five Tournament Cups and Endless Wave Survival (no death penalty).
 import { G } from '../core/state';
 import { REALMS } from '../data/realms';
+import { CUPS } from '../data/constants';
 import { addItem } from './inventory';
 import { gainXp } from './progression';
 import { onArenaBounty } from './guilds';
@@ -8,13 +9,7 @@ import { fx } from '../render/fx';
 import { audio } from '../engine/audio';
 import { pick } from '../engine/util';
 
-export const CUPS = [
-  { name: 'Bronze Cup', level: 5, gold: 600, trophy: 'trophy_cup1' },
-  { name: 'Silver Cup', level: 12, gold: 1500, trophy: 'trophy_cup2' },
-  { name: 'Gold Cup', level: 22, gold: 3500, trophy: 'trophy_cup3' },
-  { name: 'Platinum Cup', level: 32, gold: 7000, trophy: 'trophy_cup4' },
-  { name: 'Champion Cup', level: 42, gold: 14000, trophy: 'trophy_cup5' },
-];
+export { CUPS };
 
 interface ArenaState {
   mode: 'cup' | 'endless';

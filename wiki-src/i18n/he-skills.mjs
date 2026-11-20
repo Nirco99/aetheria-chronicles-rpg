@@ -1,0 +1,95 @@
+// Hebrew: Sword Skills, passives, awakenings, Rune Morphs, keystones, bridges and reactions.
+export default {
+  // ---- active skills
+  'Leap 150 units along your aim and cut through everything at the landing point. 170% ATK, knockback.': 'זנקו 150 יחידות לכיוון הכוונה וחתכו כל מה שנמצא בנקודת הנחיתה. 170% התקפה, הדיפה.',
+  'A falling cut followed by a rising crescent that launches foes. 145% + 160% ATK, stun.': 'חיתוך יורד ואחריו סהר עולה שמעיף אויבים לאוויר. 145% + 160% התקפה, הלם.',
+  'Gather crimson light, then pierce 250 units forward through every enemy. 460% ATK, huge Break.': 'אספו אור ארגמני, ואז דקרו 250 יחידות קדימה דרך כל האויבים. 460% התקפה, שבירה עצומה.',
+  'Seven strikes that draw a seven-pointed star of light; the last one detonates. 6 x 95% + 220% ATK.': 'שבע מכות שמשרטטות כוכב אור בעל שבעה קודקודים; האחרונה מתפוצצת. 6 x 95% + 220% התקפה.',
+  'Cross your blades for 0.6s. If struck, Perfect Parry automatically and answer with a critical X-slash (2 x 170%). Otherwise, a quick X-slash.': 'הצליבו את הלהבים ל-0.6 שניות. אם תותקפו, תבצעו הדיפה מושלמת אוטומטית ותשיבו בחיתוך X קריטי (2 x 170%). אחרת, חיתוך X מהיר.',
+  'Ultimate: become a 27-hit hurricane of blades that you can steer. 26 x 40% + 300% ATK to everything around you.': 'כישור-על: הפכו להוריקן להבים של 27 מכות שאפשר לנווט. 26 x 40% + 300% התקפה לכל מה שסביבכם.',
+  'Drive your shield into the enemy: stun 1.2s and massive Break damage. 110% ATK.': 'הלמו במגן באויב: הלם ל-1.2 שניות ונזק שבירה אדיר. 110% התקפה.',
+  'Raise a directional barrier for 3.5s: every attack from the front is negated, and DEF +20%.': 'הרימו מחסום כיווני ל-3.5 שניות: כל התקפה מלפנים מבוטלת, והגנה +20%.',
+  'Leap and slam the ground: 220% ATK to all nearby enemies, stun 0.8s, heavy Break.': 'קפצו והלמו בקרקע: 220% התקפה לכל האויבים הקרובים, הלם ל-0.8 שניות, שבירה כבדה.',
+  "Knight's Provocation": 'התגרות האביר',
+  'Taunt every enemy within 280 units for 6s and surge DEF by 50% for 8s. Protects your companion.': 'התגרו בכל אויב בטווח 280 יחידות ל-6 שניות והגבירו את ההגנה ב-50% ל-8 שניות. מגן על בן הלוויה.',
+  'Ultimate: raise a golden dome for 4.5s. You and allies inside are invulnerable; enemies are pushed out.': 'כישור-על: הרימו כיפה זהובה ל-4.5 שניות. אתם ובני הברית בפנים חסינים; אויבים נהדפים החוצה.',
+  'A twisting thrust that shreds armor: 240% ATK and -35% enemy DEF for 8s.': 'דקירה מסתובבת שקורעת שריון: 240% התקפה ו-35%- להגנת האויב ל-8 שניות.',
+  'Ultimate: spin your polearm for 2.5s while moving freely, then finish with a cyclone burst. 14 x 60% + 200% ATK.': 'כישור-על: סובבו את כלי המוט ל-2.5 שניות תוך תנועה חופשית, וסיימו בפרץ ציקלון. 14 x 60% + 200% התקפה.',
+  'Draw deep and loose an arrow that pierces every enemy in its path. 240% ATK.': 'מתחו עמוק ושחררו חץ שחודר דרך כל אויב בדרכו. 240% התקפה.',
+  'Fire five arrows in a fan. 5 x 110% ATK.': 'ירו חמישה חצים במניפה. 5 x 110% התקפה.',
+  'Backflip out of danger (invulnerable), leave a snare trap that roots for 2.5s, and fire mid-air. 180% ATK.': 'בצעו סלטה לאחור הרחק מהסכנה (חסינים), השאירו מלכודת שכובלת ל-2.5 שניות, וירו באוויר. 180% התקפה.',
+  'Call 14 starlit arrows down on the area around your cursor over 1.6s. 14 x 85% ATK.': 'הורידו 14 חצי אור כוכבים על האזור שסביב הסמן במשך 1.6 שניות. 14 x 85% התקפה.',
+  'Ultimate: charge a phoenix-fire rail that obliterates a 640-unit line. 620% ATK, Burn, recoil dash.': 'כישור-על: טענו קרן אש של עוף החול שמחריבה קו של 640 יחידות. 620% התקפה, בעירה, ניתור רתע לאחור.',
+  'Call a meteor onto your cursor. After a short fall it explodes: 330% MAG fire damage in an area, Burn.': 'הורידו מטאור על הסמן. אחרי נפילה קצרה הוא מתפוצץ: 330% קסם נזק אש באזור, בעירה.',
+  'Hurl a piercing lance of absolute zero that freezes enemies solid for 2s. 260% MAG.': 'השליכו רומח חודר של אפס מוחלט שמקפיא אויבים לגמרי ל-2 שניות. 260% קסם.',
+  'Wrap yourself in a barrier worth 30% of your max HP for 6s and release a repelling nova. 190% MAG.': 'עטפו את עצמכם במחסום בשווי 30% מהחיים המרביים ל-6 שניות ושחררו נובה הודפת. 190% קסם.',
+  'Ultimate: consecrate the ground for 8s. Allies inside heal 4% max HP every half second and are cleansed; enemies are slowed.': 'כישור-על: קדשו את הקרקע ל-8 שניות. בני ברית בפנים מתרפאים ב-4% מהחיים המרביים כל חצי שנייה ומטוהרים; אויבים מואטים.',
+
+  // ---- rune morph name suffixes
+  Executioner: 'התליין',
+  'Phantom Echo': 'הד הרפאים',
+  'Rime Siphon': 'יניקת כפור',
+  'Venom Siphon': 'יניקת ארס',
+  'Storm Siphon': 'יניקת סערה',
+  'Pyre Siphon': 'יניקת מוקד',
+  'Gale Siphon': 'יניקת סופה',
+  'Aether Siphon': 'יניקת אתר',
+
+  // ---- passives
+  '+3% critical chance and +8% critical damage per level.': '+3% סיכוי קריטי ו-+8% נזק קריטי לכל רמה.',
+  '+2% critical chance and +6% critical damage per level.': '+2% סיכוי קריטי ו-+6% נזק קריטי לכל רמה.',
+  '+6% DEF per level with a shield equipped.': '+6% הגנה לכל רמה כשמגן מצויד.',
+  'Reflect 10% of blocked damage back at the attacker per level.': 'מחזיר לתוקף 10% מהנזק שנחסם לכל רמה.',
+  '+4 Break power and +3% critical chance per level.': '+4 כוח שבירה ו-+3% סיכוי קריטי לכל רמה.',
+  '+4% critical chance per level with a bow.': '+4% סיכוי קריטי לכל רמה עם קשת.',
+  "Hunter's Mark": 'סימן הצייד',
+  '+5% ATK per level, and +5% damage per level against targets more than 160 units away.': '+5% התקפה לכל רמה, ו-+5% נזק לכל רמה נגד מטרות שרחוקות יותר מ-160 יחידות.',
+  '6% chance per level to instantly refund the cooldown of a spell you cast.': '6% סיכוי לכל רמה לאפס מיד את זמן הטעינה של לחש שהטלתם.',
+
+  // ---- awakenings
+  "Master Blacksmith's Soul": 'נשמת הנפח האמן',
+  "Paragon's Divine Aegis": 'האגיס האלוהי של הפרגון',
+  'When your HP falls below 40%, an emergency barrier worth 30% of your max HP erupts. Recharges every 45 seconds.': 'כשהחיים יורדים מתחת ל-40%, מתפרץ מחסום חירום בשווי 30% מהחיים המרביים. נטען מחדש כל 45 שניות.',
+  'Win a boss fight with less than 15% HP left, or block 2,000 total damage.': 'נצחו בקרב בוס כשנותרו פחות מ-15% חיים, או חסמו 2,000 נזק בסך הכול.',
+
+  // ---- rune morphs
+  'Execution Rune': 'רונת ההוצאה להורג',
+  'x1.35 damage, +15% area and +50% damage against enemies below 30% HP.': 'x1.35 נזק, +15% שטח ו-+50% נזק נגד אויבים מתחת ל-30% חיים.',
+  'Shadow-Clone Rune': 'רונת שיבוט הצללים',
+  'A shadow clone repeats every hit 0.25s later for 40% damage, and you gain a short evasive step after the skill.': 'שיבוט צללים חוזר על כל מכה 0.25 שניות מאוחר יותר ב-40% נזק, ואחרי הכישור תקבלו צעד התחמקות קצר.',
+  'Elemental Rune': 'רונת היסודות',
+  'Converts the skill to your branch element, applies its reaction gauge and heals 8% of damage dealt.': 'ממירה את הכישור ליסוד של הענף שלו, מוסיפה את מד התגובה שלו ומרפאה 8% מהנזק שנגרם.',
+
+  // ---- keystones
+  'Sword combo finishers launch a piercing crescent wave (80% damage). +15% critical damage.': 'סיומי קומבו בחרב משגרים גל סהר חודר (80% נזק). +15% נזק קריטי.',
+  'Every 10th hit within 3s triggers a free whirlwind flurry around you. +8% attack speed.': 'כל מכה עשירית בתוך 3 שניות מפעילה מטח מערבולת חינמי סביבכם. +8% מהירות התקפה.',
+  'Perfect Parry window +0.08s and blocking costs half Stamina. +15% DEF.': 'חלון ההדיפה המושלמת +0.08 שניות וחסימה עולה חצי סיבולת. +15% הגנה.',
+  "Dragoon's Momentum": 'תנופת הדרגון',
+  'Wall Slams trigger at lower speed and deal +90% instead of +45% impact damage. +3 Break power.': 'הטחות בקיר מופעלות במהירות נמוכה יותר וגורמות +90% במקום +45% נזק פגיעה. +3 כוח שבירה.',
+  'Your first hit against a full-HP enemy is always a critical. +8% critical chance.': 'המכה הראשונה שלכם באויב עם חיים מלאים תמיד קריטית. +8% סיכוי קריטי.',
+  'Sword Skills cost 15% less MP. +40% MP regeneration and +8% skill damage.': 'כישורי חרב עולים 15% פחות מאנה. +40% התחדשות מאנה ו-+8% נזק כישורים.',
+
+  // ---- bridges
+  "Duelist's Accord": 'ברית הדו-קרבנים',
+  'Hybrid node: +6% attack speed and +4% critical chance.': 'צומת היברידי: +6% מהירות התקפה ו-+4% סיכוי קריטי.',
+  'Hybrid node: +6% move speed and +12% critical damage.': 'צומת היברידי: +6% מהירות תנועה ו-+12% נזק קריטי.',
+  'Hybrid node: +8% ATK and +8% MAG.': 'צומת היברידי: +8% התקפה ו-+8% קסם.',
+  'Hybrid node: +10% DEF, +30 MP and +20% MP regeneration.': 'צומת היברידי: +10% הגנה, +30 מאנה ו-+20% התחדשות מאנה.',
+  'Hybrid node: +8% DEF and +4 Break power.': 'צומת היברידי: +8% הגנה ו-+4 כוח שבירה.',
+  "Lancer's Edge": 'חוד הרומחאי',
+  'Hybrid node: +8% ATK and +6% skill damage.': 'צומת היברידי: +8% התקפה ו-+6% נזק כישורים.',
+
+  // ---- reactions
+  MELT: 'MELT · התכה',
+  'Burn + Frost: the hit detonates for a 2.2x elemental burst.': 'בעירה + כפור: המכה מתפוצצת בפרץ יסודי של x2.2.',
+  SHATTER: 'SHATTER · ניפוץ',
+  'Frost + Bleed: ice shrapnel explodes around the target and shatters 35% of its Break Bar.': 'כפור + דימום: רסיסי קרח מתפוצצים סביב המטרה ומנפצים 35% ממד השבירה שלה.',
+  OVERLOAD: 'OVERLOAD · עומס-יתר',
+  'Burn + Shock: a plasma blast deals area damage and hurls enemies outward.': 'בעירה + הלם חשמלי: פיצוץ פלזמה גורם נזק אזורי ומעיף אויבים החוצה.',
+  SUPERCONDUCT: 'SUPERCONDUCT · מוליכות-על',
+  'Frost + Shock: armor collapses, -40% DEF for 8 seconds.': 'כפור + הלם חשמלי: השריון קורס, 40%- הגנה ל-8 שניות.',
+  'TEMPEST SPREAD': 'TEMPEST SPREAD · התפשטות הסערה',
+  'Venom + any gauge: every status and gauge on the target spreads to nearby enemies.': 'ארס + כל מד אחר: כל מצב וכל מד שעל המטרה מתפשטים לאויבים הקרובים.',
+  'AETHER SINGULARITY': 'AETHER SINGULARITY · סינגולריות אתר',
+  'Aether + any gauge: a gravity vortex drags enemies together and crushes them.': 'אתר + כל מד אחר: מערבולת כבידה גוררת את האויבים יחד ומועכת אותם.',
+};

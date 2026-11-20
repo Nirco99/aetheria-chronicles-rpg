@@ -14,6 +14,8 @@ import {
   POWER_BY_ID, REACTIONS, SECTOR_ORDER, SKILL_MAX_RANK, AFFINITY_NAMES, AFFINITY_RANKS, affinityRank, extractable, morphName, skillRankCost, skillRankMastery,
 } from '../data/v3';
 import { MONSTERS } from '../data/monsters';
+import { FRAMES } from '../data/framedata';
+import { huntMasteryKills, huntMasteryMf, lootTable } from '../data/loot';
 import { COMPANION_BY_ID } from '../data/guilds';
 import { Monster } from '../entities/monster';
 import { drawMonster } from '../render/monsters';
@@ -435,13 +437,19 @@ export function openBestiary(): void {
         requestAnimationFrame(draw);
       };
       requestAnimationFrame(draw);
-      const weak = def.element === 'fire' ? 'Frost (MELT)' : def.element === 'frost' ? 'Fire (MELT)' : def.element === 'void' ? 'Holy / Lightning' : def.element === 'holy' ? 'Void' : 'Any element';
+      const els = (xs?: string[]) => (xs && xs.length ? xs.map((e) => e[0].toUpperCase() + e.slice(1)).join(', ') : 'none');
+      const kills = s.bestiary[def.id] ?? 0;
+      const need = huntMasteryKills(def);
+      const lines = lootTable(def, { level: Math.max(1, s.level), floor: 0, mf: (G.player?.stats.magicFind ?? 0) + huntMasteryMf(def, kills) });
+      const pct = (p: number) => `${(p * 100).toFixed(p < 0.1 ? 1 : 0)}%`;
       detail.append(cv,
         h('div', { class: 'cs-title', text: def.name }),
         h('div', { class: 'cs-sub', text: `${def.title ?? (def.boss ? 'Boss' : def.elite ? 'Night Elite' : 'Monster')}` }),
-        h('div', { class: 'cs-stat', text: `Slain: ${s.bestiary[def.id]}  -  Element: ${def.element ?? 'none'}  -  Weak to: ${weak}` }),
+        h('div', { class: 'cs-stat', text: `Slain: ${kills}  -  Element: ${def.element ?? 'none'}` }),
+        h('div', { class: 'cs-stat', text: `Weak to: ${els(def.weak)} (x${FRAMES.weakMult})  -  Resists: ${els(def.resist)} (x${FRAMES.resistMult})` }),
+        h('div', { class: 'cs-stat' + (kills >= need ? ' gold' : ''), text: kills >= need ? 'Hunting Mastery: +10% Magic Find against this species' : `Hunting Mastery: ${kills} / ${need} slain (+10% Magic Find once mastered)` }),
         h('div', { class: 'cs-stat', text: `Attacks: ${def.attacks.map((a) => a.name ?? a.id).join(', ')}` }),
-        h('div', { class: 'cs-stat', text: `Drops: ${def.drops.map((d) => itemDef(d.id).name).join(', ') || '-'}` }));
+        h('div', { class: 'cs-stat', text: `Drops: ${lines.filter((l) => l.kind === 'item' && l.own && l.item).map((l) => `${itemDef(l.item as string).name} ${pct(l.chance)}`).join(', ') || '-'}` }));
     } else detail.append(h('p', { class: 'dim pad', text: 'Defeat a creature to record it here. Every entry shows a live 3D-oblique model, its attacks, weaknesses and drops.' }));
     b.append(h('div', { class: 'sp-line', text: `Recorded: ${seen.length} / ${all.length}` }), h('div', { class: 'best-wrap' }, list, detail));
   }, { wide: true, subtitle: 'O' });

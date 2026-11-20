@@ -4,9 +4,10 @@ import type {
   Rarity, StatBlock, WeaponType, GemType,
 } from '../types/game';
 import type { Affix, AffixKind } from '../types/game';
-import { GRADE_INFO, RARITY_MULT, TIERS, tierForLevel } from './constants';
+import { GRADE_INFO, RARITY_MULT, TEMPER_STEP, TIERS, tierForLevel } from './constants';
 import { uid, weighted } from '../engine/util';
 import { AFFIXES, AFFIX_COUNT, LEGENDARY_POWERS, SETS, SET_BY_ID, UNIQUES, UNIQUE_BY_ID, type AffixDef } from './v3';
+import { LOOT_WEIGHTS, MF_RARITY_UPGRADE, SET_PIECE_CHANCE } from './loot';
 
 const I: Record<string, ItemDef> = {};
 function def(d: ItemDef): void {
@@ -352,11 +353,11 @@ export function affixLabel(a: Affix): string {
   return d.flat ? `+${a.value} ${d.label}` : `+${(a.value * 100).toFixed(a.value < 0.1 ? 1 : 0)}% ${d.label}`;
 }
 
-export function makeSetPiece(setId: string, pieceIdx: number, tier: number, rarity: Rarity): GearItem {
+export function makeSetPiece(setId: string, pieceIdx: number, tier: number, rarity: Rarity, affixes = true): GearItem {
   const set = SET_BY_ID[setId];
   const piece = set.pieces[pieceIdx % set.pieces.length];
   const r = Math.max(3, rarity) as Rarity;
-  return makeGear(piece.baseId, tier, r, { name: piece.name, colors: { ...set.colors }, set: set.id, statMult: 1.08 });
+  return makeGear(piece.baseId, tier, r, { name: piece.name, colors: { ...set.colors }, set: set.id, statMult: 1.08, affixes });
 }
 
 export function randomSetPiece(tier: number, rarity: Rarity): GearItem {
@@ -364,10 +365,10 @@ export function randomSetPiece(tier: number, rarity: Rarity): GearItem {
   return makeSetPiece(set.id, Math.floor(Math.random() * set.pieces.length), tier, rarity);
 }
 
-export function makeUnique(uniqueId: string, tier: number): GearItem {
+export function makeUnique(uniqueId: string, tier: number, affixes = true): GearItem {
   const u = UNIQUE_BY_ID[uniqueId];
   const g = makeGear(u.baseId, tier, 4, { name: u.name, colors: { ...u.colors }, unique: u.id, statMult: 1.15, affixes: false });
-  g.affixes = rollAffixes(g.kind, g.tier, 3);
+  g.affixes = affixes ? rollAffixes(g.kind, g.tier, 3) : [];
   g.power = u.power;
   for (const k of Object.keys(u.stats) as (keyof StatBlock)[]) {
     const v = u.stats[k] ?? 0;
@@ -389,7 +390,7 @@ export function gearStats(g: GearItem): StatBlock {
   const out: StatBlock = {};
   const rm = RARITY_MULT[g.rarity];
   const gm = g.grade ? GRADE_INFO[g.grade].mult : 1;
-  const tm = 1 + 0.07 * g.temper;
+  const tm = 1 + TEMPER_STEP * g.temper;
   for (const k of Object.keys(g.base) as (keyof StatBlock)[]) {
     const v = g.base[k] ?? 0;
     if (FRACTIONAL.includes(k)) out[k] = +(v * (v > 0 ? rm * gm : 1)).toFixed(4);
@@ -416,13 +417,7 @@ export function isTwoHanded(g: GearItem | null | undefined): boolean {
   return !!g && (g.wtype === 'spear' || g.wtype === 'halberd' || g.wtype === 'bow' || g.wtype === 'staff');
 }
 
-/** loot rarity weights for [normal, elite, boss, abyss-deep] sources */
-export const LOOT_WEIGHTS: number[][] = [
-  [70, 22, 6.5, 1.3, 0.2, 0],
-  [20, 40, 28, 9, 3, 0],
-  [0, 20, 45, 25, 10, 0],
-  [0, 10, 40, 30, 18, 2],
-];
+export { LOOT_WEIGHTS };
 
 export function rollRarity(source: number): Rarity {
   const w = LOOT_WEIGHTS[source];
@@ -430,14 +425,15 @@ export function rollRarity(source: number): Rarity {
   return idx as Rarity;
 }
 
+/** one random gear drop; the odds are documented by rarityOdds() / gearRollOdds() in data/loot.ts */
 export function randomGear(level: number, source: number, magicFind = 0): GearItem {
   const tier = tierForLevel(level);
   const ids = GEAR_BASE_IDS;
   const baseId = ids[Math.floor(Math.random() * ids.length)];
   let rarity = rollRarity(source);
-  if (magicFind > 0 && rarity < 4 && Math.random() < magicFind * 0.35) rarity = (rarity + 1) as Rarity;
+  if (magicFind > 0 && rarity < 4 && Math.random() < magicFind * MF_RARITY_UPGRADE) rarity = (rarity + 1) as Rarity;
   if (rarity === 5) return makeGear(baseId, 6, 5, { mythic: true });
-  if (rarity >= 3 && Math.random() < (source >= 1 ? 0.3 : 0.15)) return randomSetPiece(tier, rarity);
+  if (rarity >= 3 && Math.random() < SET_PIECE_CHANCE[source >= 1 ? 1 : 0]) return randomSetPiece(tier, rarity);
   return makeGear(baseId, tier, rarity);
 }
 

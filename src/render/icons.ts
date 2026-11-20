@@ -12,13 +12,23 @@ import { gemColor } from '../systems/stats';
 const canv = new Map<string, HTMLCanvasElement>();
 const urls = new Map<string, string>();
 
+let ICON_SCALE = 2;
+
+/** pixel density of icon canvases (the strategy wiki renders them at 4x for high-DPI cards) */
+export function setIconScale(s: number): void {
+  if (s === ICON_SCALE) return;
+  ICON_SCALE = s;
+  canv.clear();
+  urls.clear();
+}
+
 function mk(key: string, size: number, paint: (g: CanvasRenderingContext2D) => void): HTMLCanvasElement {
   let c = canv.get(key);
   if (c) return c;
   c = document.createElement('canvas');
-  c.width = c.height = size * 2;
+  c.width = c.height = size * ICON_SCALE;
   const g = c.getContext('2d') as CanvasRenderingContext2D;
-  g.scale(2, 2);
+  g.scale(ICON_SCALE, ICON_SCALE);
   g.lineJoin = 'round';
   g.lineCap = 'round';
   paint(g);

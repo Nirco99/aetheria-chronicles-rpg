@@ -4,6 +4,7 @@ import { REALMS } from './realms';
 import { MONSTERS } from './monsters';
 import { itemDef } from './items';
 import { RNG } from '../engine/util';
+import { MF_SOURCES } from './loot';
 
 export const GUILDS: Record<GuildId, GuildDef> = {
   aegis: {
@@ -21,8 +22,8 @@ export const GUILDS: Record<GuildId, GuildDef> = {
   wing: {
     id: 'wing', name: 'Crimson Wing Rangers', short: 'Crimson Wing', color: '#ff5d6c', hall: 0,
     motto: 'Swift as the wind, sure as the arrow.',
-    perk: '+3% move speed and +3% critical chance per rank',
-    perkStats: (r) => ({ move: 0.03 * r, crit: 0.03 * r }),
+    perk: '+3% move speed, +3% critical chance and +4% Magic Find per rank',
+    perkStats: (r) => ({ move: 0.03 * r, crit: 0.03 * r, magicFind: MF_SOURCES.guildPerRank * r }),
   },
   arcanum: {
     id: 'arcanum', name: 'Mystic Arcanum', short: 'Mystic Arcanum', color: '#c18cff', hall: 1,

@@ -1,7 +1,9 @@
 name: Deploy Strategy Wiki to GitHub Pages
 
 # The game is a standalone Windows desktop application (Electron) and is never deployed to the web.
-# Only the bilingual strategy wiki in wiki/ is published, at the site root and at /wiki/.
+# Only the bilingual codex in wiki/ is published, at the site root and at /wiki/. Its data bundle and
+# sprite engine are regenerated from the game's src/data on every deploy, so the live codex always
+# matches the source on main.
 
 on:
   push:
@@ -23,6 +25,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies (no Electron binary needed)
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Generate the codex from src/data
+        run: npm run wiki:build
 
       - name: Assemble the wiki site
         run: |

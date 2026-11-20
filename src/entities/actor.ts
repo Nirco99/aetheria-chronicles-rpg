@@ -1,6 +1,7 @@
 // Base class for every living thing in the world. Kept dependency-free (types, util and
 // constants only) so subclasses can extend it without module initialisation cycles.
 import type { Anim, BuffInst, BuffSpec, Dir, GaugeKind, StatusApply, StatusInst, StatusKind, Stats, Team } from '../types/game';
+import { FRAMES } from '../data/framedata';
 
 export type ActorKind = 'player' | 'companion' | 'monster' | 'npc' | 'prop' | 'shadow' | 'caravan';
 let NEXT_ID = 1;
@@ -166,7 +167,7 @@ export abstract class Actor {
       this.broken -= dt;
       if (this.broken <= 0) this.brk = 0;
     } else if (this.brkDelay > 0) this.brkDelay -= dt;
-    else if (this.brk > 0) this.brk = Math.max(0, this.brk - this.brkMax * 0.2 * dt);
+    else if (this.brk > 0) this.brk = Math.max(0, this.brk - this.brkMax * FRAMES.breakDecay * dt);
     if (this.counter) {
       this.counter.t -= dt;
       if (this.counter.t <= 0) this.counter = null;

@@ -5,7 +5,8 @@ import { gearStats, isBlade } from '../data/items';
 import { GEM_INFO } from '../data/constants';
 import { PASSIVE_SKILLS } from '../data/skills';
 import { GUILDS, GUILD_IDS, guildRank } from '../data/guilds';
-import { BRIDGE_BY_ID, KEYSTONE_BY_ID, POWER_BY_ID, SETS, setCountsOf, setStats } from '../data/v3';
+import { BRIDGE_BY_ID, KEYSTONE_BY_ID, PET_BY_ID, POWER_BY_ID, SETS, setCountsOf, setStats } from '../data/v3';
+import { MF_SOURCES } from '../data/loot';
 
 export type WeaponMode = 'sword' | 'dual' | 'spear' | 'halberd' | 'bow' | 'staff' | 'fists';
 
@@ -126,7 +127,7 @@ export function activePowers(save: SaveData): Set<string> {
 /** style rank 0 (D) .. 6 (SSS) adds attack speed, move speed and magic find */
 export function styleBonus(rank: number): { aspd: number; move: number; magicFind: number } {
   const k = Math.max(0, Math.min(6, rank)) / 6;
-  return { aspd: 0.25 * k, move: 0.15 * k, magicFind: 0.4 * k };
+  return { aspd: 0.25 * k, move: 0.15 * k, magicFind: MF_SOURCES.styleMax * k };
 }
 
 export function playerStats(save: SaveData, buffs: BuffInst[], style = 0): Stats {
@@ -145,6 +146,7 @@ export function playerStats(save: SaveData, buffs: BuffInst[], style = 0): Stats
   }
   for (const gid of GUILD_IDS) if (save.joined.includes(gid)) add(a, GUILDS[gid].perkStats(guildRank(save.guilds[gid]) + 1));
   for (const b of buffs) add(a, b.spec.stats);
+  if (save.pet) a.magicFind += PET_BY_ID[save.pet]?.mf ?? 0;
   if (save.awakenings.includes('aw_dual')) a.aspd += 0.2;
   if (buffs.some((b) => b.spec.id === 'rested')) a.xpPct += 0.2;
   const smith = save.awakenings.includes('aw_smith');

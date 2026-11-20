@@ -1,5 +1,5 @@
 // Smelting, alchemy, cooking recipes plus forge blueprint / temper / salvage formulas.
-import type { GearItem } from '../types/game';
+import type { CraftGrade, GearItem, Rarity } from '../types/game';
 import { GEAR_BASES } from './items';
 import { TIERS } from './constants';
 
@@ -59,7 +59,20 @@ export function blueprintCost(baseId: string, tier: number, mythic: boolean): Bl
   return { ins, gold: Math.round(40 * Math.pow(tier + 1, 1.7) * (mythic ? 4 : 1)) };
 }
 
+/** forged gear rarity by craft grade (Mythic blueprints always forge Mythic) */
+export const GRADE_RARITY: Record<CraftGrade, Rarity> = { standard: 1, fine: 2, masterwork: 3, supreme: 4 };
+
 export const TEMPER_CHANCE = [1, 1, 1, 1, 1, 0.85, 0.7, 0.55, 0.4, 0.3];
+/** tempering success bonuses: Gilded Anvil Syndicate per rank (1-5) and the Gilded Anvil Artisan 6-piece set */
+export const TEMPER_GUILD_PER_RANK = 0.02;
+export const TEMPER_SET_BONUS = 0.15;
+/** hammer-gauge score (3 strikes x 0..3 points) x forge quality needed for each craft grade */
+export const GRADE_THRESHOLDS = { fine: 3.8, masterwork: 6.5, supreme: 8.6 };
+/** quick (auto) forging grade odds */
+export const AUTO_FORGE_ODDS = { standard: 0.6, fine: 0.35, masterwork: 0.05 };
+/** forge quality: x1.1 at a Personal Master Anvil, +2% per Gilded Anvil rank */
+export const FORGE_HOME_QUALITY = 1.1;
+export const FORGE_GUILD_QUALITY = 0.02;
 
 export function temperCost(g: GearItem): { stone: string; stones: number; gold: number; chance: number } {
   const next = g.temper + 1;

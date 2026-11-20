@@ -1,5 +1,6 @@
 // Bestiary: regular monsters, night elites, dungeon guardians and the five multi-phase realm bosses.
-import type { BossDef, HumanoidStyle, MonsterAttackDef, MonsterDef } from '../types/game';
+import type { BossDef, Element, HumanoidStyle, MonsterAttackDef, MonsterDef } from '../types/game';
+import { FRAMES } from './framedata';
 
 type A = Partial<MonsterAttackDef> & { id: string };
 const atk = (o: A): MonsterAttackDef => ({
@@ -354,6 +355,71 @@ mon({
   attacks: [atk({ id: 'gate_pulse', name: 'Corruption Pulse', range: 110, cd: 4.5, windup: 1, shape: 'circle', at: 'self', r: 110, mult: 1.2, element: 'void', kb: 200 })],
   drops: [{ id: 'relic_shard', chance: 0.35 }, { id: 'enh_stone', chance: 1, min: 2, max: 3 }],
 });
+
+// ================================================================== ELEMENTAL AFFINITIES
+// A hit whose element matches a weakness deals x1.3 damage, a resistance x0.6 (FRAMES.weakMult / resistMult).
+const AFFINITY: Record<string, [Element[], Element[]]> = {
+  dire_wolf: [['fire'], ['frost']],
+  frenzy_boar: [['poison'], ['wind']],
+  kobold_scout: [['lightning'], []],
+  kobold_trooper: [['lightning'], []],
+  kobold_sentinel: [['lightning', 'poison'], ['wind']],
+  elite_thornback: [['fire'], ['frost', 'poison']],
+  treant_guardian: [['fire'], ['poison', 'frost']],
+  venom_stalker: [['fire', 'frost'], ['poison']],
+  water_elemental: [['lightning'], ['fire', 'frost']],
+  blight_sporeling: [['fire'], ['poison']],
+  elite_gloomweaver: [['fire'], ['poison']],
+  spore_pod: [['fire'], ['poison']],
+  magma_drake: [['frost'], ['fire']],
+  obsidian_golem: [['frost'], ['fire', 'poison']],
+  flame_knight: [['frost'], ['fire']],
+  cinder_imp: [['frost', 'wind'], ['fire']],
+  elite_pyreclaw: [['frost'], ['fire']],
+  frost_wyvern: [['fire', 'lightning'], ['frost']],
+  phantom_lancer: [['void'], ['poison', 'frost']],
+  ice_wraith: [['fire'], ['frost', 'poison']],
+  frost_revenant: [['fire'], ['frost']],
+  elite_rimehowl: [['fire'], ['frost']],
+  ice_clone: [['fire'], ['frost']],
+  seraph_automaton: [['lightning'], ['poison', 'holy']],
+  abyssal_reaver: [['holy', 'lightning'], ['void']],
+  aether_wisp: [['void'], ['lightning']],
+  zenith_templar: [['void'], ['holy']],
+  elite_nullseraph: [['lightning'], ['void', 'poison']],
+  b_kobold: [['lightning'], ['poison']],
+  b_treant: [['fire'], ['poison', 'frost']],
+  b_wyrm: [['frost'], ['fire']],
+  b_empress: [['fire'], ['frost']],
+  b_paragon: [['void'], ['holy']],
+  r_colossus: [['lightning'], ['poison', 'fire']],
+  r_reaper: [['holy', 'fire'], ['void', 'poison']],
+  ev_gate: [['holy', 'lightning'], ['void']],
+};
+for (const [id, [weak, resist]] of Object.entries(AFFINITY)) {
+  M[id].weak = weak;
+  M[id].resist = resist;
+}
+
+/** damage multiplier of an element against a creature */
+export function elementAffinity(def: MonsterDef, el: Element): number {
+  if (def.weak?.includes(el)) return FRAMES.weakMult;
+  if (def.resist?.includes(el)) return FRAMES.resistMult;
+  return 1;
+}
+
+/** the strongest elemental bonus an attacker carries (gems, blade oils), if any */
+export function dominantElement(elem: Partial<Record<Element, number>>): Element | null {
+  let best: Element | null = null;
+  let bv = 0;
+  for (const [k, v] of Object.entries(elem) as [Element, number | undefined][]) {
+    if ((v ?? 0) > bv) {
+      bv = v ?? 0;
+      best = k;
+    }
+  }
+  return best;
+}
 
 export const MONSTERS = M;
 export const BOSSES = B;

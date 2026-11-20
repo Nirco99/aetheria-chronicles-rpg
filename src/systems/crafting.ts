@@ -3,7 +3,8 @@ import type { CraftGrade, GearItem, GemType, Rarity } from '../types/game';
 import { G } from '../core/state';
 import { GRADE_INFO, MAX_TEMPER } from '../data/constants';
 import { makeGear, itemDef } from '../data/items';
-import { blueprintCost, salvageYield, socketCost, temperCost, type Recipe } from '../data/recipes';
+import { GRADE_RARITY, AUTO_FORGE_ODDS, FORGE_GUILD_QUALITY, FORGE_HOME_QUALITY, GRADE_THRESHOLDS, TEMPER_GUILD_PER_RANK, TEMPER_SET_BONUS, blueprintCost, salvageYield, socketCost, temperCost, type Recipe } from '../data/recipes';
+import { hasPower } from './powers';
 import { guildRank } from '../data/guilds';
 import { addGear, addItem, gearFull, hasItems, isEquipped, removeGear, takeItems, countItem, removeItem } from './inventory';
 import { checkAwakenings } from './progression';
@@ -34,26 +35,25 @@ export function canForge(baseId: string, tier: number, mythic: boolean): string 
   return null;
 }
 
-const GRADE_RARITY: Record<CraftGrade, Rarity> = { standard: 1, fine: 2, masterwork: 3, supreme: 4 };
 
 /** hammer-gauge score: 3 strikes x 0..3 points */
 export function gradeFromScore(score: number, quality: number): CraftGrade {
   const s = score * quality;
-  if (s >= 8.6) return 'supreme';
-  if (s >= 6.5) return 'masterwork';
-  if (s >= 3.8) return 'fine';
+  if (s >= GRADE_THRESHOLDS.supreme) return 'supreme';
+  if (s >= GRADE_THRESHOLDS.masterwork) return 'masterwork';
+  if (s >= GRADE_THRESHOLDS.fine) return 'fine';
   return 'standard';
 }
 
 export function autoForgeGrade(): CraftGrade {
   const r = Math.random();
-  return r < 0.6 ? 'standard' : r < 0.95 ? 'fine' : 'masterwork';
+  return r < AUTO_FORGE_ODDS.standard ? 'standard' : r < AUTO_FORGE_ODDS.standard + AUTO_FORGE_ODDS.fine ? 'fine' : 'masterwork';
 }
 
 export function forgeQualityBonus(home: boolean): number {
   const s = G.save;
-  let q = home ? 1.1 : 1;
-  if (s.joined.includes('anvil')) q += 0.02 * (guildRank(s.guilds.anvil) + 1);
+  let q = home ? FORGE_HOME_QUALITY : 1;
+  if (s.joined.includes('anvil')) q += FORGE_GUILD_QUALITY * (guildRank(s.guilds.anvil) + 1);
   return q;
 }
 
@@ -81,9 +81,7 @@ export function temper(g: GearItem): { ok: boolean; msg: string } {
   if (G.save.gold < c.gold) return { ok: false, msg: `Need ${c.gold} G.` };
   removeItem(c.stone, c.stones);
   G.save.gold -= c.gold;
-  const s = G.save;
-  const bonus = s.joined.includes('anvil') ? 0.02 * (guildRank(s.guilds.anvil) + 1) : 0;
-  if (Math.random() < c.chance + bonus) {
+  if (Math.random() < c.chance + temperBonus()) {
     g.temper++;
     audio.play('anvil');
     if (isEquipped(g.uid)) G.player.refresh();
@@ -91,6 +89,12 @@ export function temper(g: GearItem): { ok: boolean; msg: string } {
   }
   audio.play('error');
   return { ok: false, msg: 'The tempering failed. Materials were consumed, but the item is unharmed.' };
+}
+
+/** tempering success bonus from the Gilded Anvil Syndicate and the Artisan's Pride set power */
+export function temperBonus(): number {
+  const s = G.save;
+  return (s.joined.includes('anvil') ? TEMPER_GUILD_PER_RANK * (guildRank(s.guilds.anvil) + 1) : 0) + (hasPower('s6_anvil') ? TEMPER_SET_BONUS : 0);
 }
 
 export function socketGem(g: GearItem, slot: number, gem: GemType): string | null {

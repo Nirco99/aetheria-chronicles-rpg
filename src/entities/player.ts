@@ -10,6 +10,7 @@ import { SKILL_BY_ID } from '../data/skills';
 import { BRANCH_INFO, HOTBAR_SIZE } from '../data/constants';
 import { activePowers, activeSet, gemColor, modeBranch, playerStats, setBranches, weaponMode, type WeaponMode } from '../systems/stats';
 import { COMBOS, basicHit, reachOf } from '../systems/basic';
+import { FRAMES } from '../data/framedata';
 import { buildPlayerLook, type Look } from '../render/paperdoll';
 import { fx } from '../render/fx';
 import { audio } from '../engine/audio';
@@ -28,8 +29,8 @@ type BufKind = 'attack' | 'skill' | 'dodge' | 'parry' | 'switch' | 'swap';
 const KEYS_HOTBAR = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'];
 const KEYS_QUICK = ['KeyZ', 'KeyX', 'KeyC'];
 /** every combat input is remembered for 160ms and fires the moment it becomes legal */
-export const INPUT_BUFFER = 0.16;
-const STEP_FRICTION = 0.84;
+export const INPUT_BUFFER = FRAMES.inputBuffer;
+const STEP_FRICTION = FRAMES.stepFriction;
 
 export class Player extends Actor {
   readonly kind = 'player' as const;
@@ -488,21 +489,21 @@ export class Player extends Actor {
   }
 
   tryDodge(mx: number, my: number): boolean {
-    if (this.dodgeCd > 0 || this.sta < 18) return false;
+    if (this.dodgeCd > 0 || this.sta < FRAMES.dodgeMinStamina) return false;
     if (this.st === 'attack') {
-      if (!this.canCancelAttack() && this.atkT < this.atkDur * 0.45) return false;
+      if (!this.canCancelAttack() && this.atkT < this.atkDur * FRAMES.dodgeCancelFrac) return false;
     } else if (this.st === 'skill') {
       if (!this.canCancelSkill()) return false;
       this.cancelCasting();
     } else if (this.st !== 'normal') return false;
     if (this.mounted) this.dismount(false);
     this.st = 'dodge';
-    this.dodgeDur = 0.24;
-    this.dodgeT = 0.24;
-    this.iframes = Math.max(this.iframes, 0.28);
-    this.dodgeCd = 0.38;
+    this.dodgeDur = FRAMES.dodgeDur;
+    this.dodgeT = FRAMES.dodgeDur;
+    this.iframes = Math.max(this.iframes, FRAMES.dodgeIframes);
+    this.dodgeCd = FRAMES.dodgeCooldown;
     this.dodgeAng = mx || my ? Math.atan2(my, mx) : this.aim;
-    this.sta -= 20;
+    this.sta -= FRAMES.dodgeStamina;
     this.staDelay = 0.6;
     this.blocking = false;
     this.stepVx = this.stepVy = 0;
@@ -515,10 +516,10 @@ export class Player extends Actor {
   /** Shadow-Clone rune: a short evasive hop after the skill */
   private evasiveStep(): void {
     this.st = 'dodge';
-    this.dodgeDur = 0.14;
-    this.dodgeT = 0.14;
+    this.dodgeDur = FRAMES.evasiveDur;
+    this.dodgeT = FRAMES.evasiveDur;
     this.dodgeAng = this.aim + Math.PI;
-    this.iframes = Math.max(this.iframes, 0.18);
+    this.iframes = Math.max(this.iframes, FRAMES.evasiveIframes);
     fx.dust(this.x, this.y, 4);
   }
 
@@ -530,7 +531,7 @@ export class Player extends Actor {
     }
     if (this.atkCd > 0) return false;
     if (this.st === 'attack') {
-      if (this.atkT > this.atkDur * 0.35) this.queued = true;
+      if (this.atkT > this.atkDur * FRAMES.hitFrac) this.queued = true;
       return true;
     }
     if (this.st === 'skill' && this.canCancelSkill() && this.casting?.eventsDone) {
@@ -543,11 +544,11 @@ export class Player extends Actor {
     if (this.riposting) {
       this.riposteT = 0;
       this.combo = list.length - 1;
-    } else if (G.time - this.lastAtkEnd < 0.45 && this.combo < list.length - 1) this.combo++;
+    } else if (G.time - this.lastAtkEnd < FRAMES.comboChain && this.combo < list.length - 1) this.combo++;
     else this.combo = 0;
     const h = list[this.combo];
     this.aim = aim;
-    this.atkDur = (h.dur / this.stats.aspd) * (this.riposting ? 0.8 : 1);
+    this.atkDur = (h.dur / this.stats.aspd) * (this.riposting ? FRAMES.riposteSpeed : 1);
     this.atkT = 0;
     this.hitDone = false;
     this.st = 'attack';
@@ -567,7 +568,7 @@ export class Player extends Actor {
 
   /** 110-260 px/s impulse toward the cursor / nearest target, stopping short of it */
   private kineticStep(aim: number, heavy: boolean): void {
-    let sp = heavy ? 260 : 110 + 50 * this.combo;
+    let sp = heavy ? FRAMES.stepHeavy : FRAMES.stepLight + FRAMES.stepPerHit * this.combo;
     const reach = reachOf(this.mode);
     let best: Actor | null = null;
     let bd = reach * 1.9;
@@ -583,7 +584,7 @@ export class Player extends Actor {
       const gap = bd - (best.radius + 14);
       sp = gap < 6 ? 0 : Math.min(sp, gap * 9.6);
     }
-    sp = clamp(sp, 0, 260);
+    sp = clamp(sp, 0, FRAMES.stepHeavy);
     this.stepVx = Math.cos(aim) * sp;
     this.stepVy = Math.sin(aim) * sp;
   }
@@ -592,15 +593,15 @@ export class Player extends Actor {
     this.atkT += dt;
     this.anim.swing = this.atkT / this.atkDur;
     if (mx || my) {
-      G.world.map.move(this, mx * baseSpeed * 0.28 * dt, my * baseSpeed * 0.28 * dt);
+      G.world.map.move(this, mx * baseSpeed * FRAMES.attackMoveMult * dt, my * baseSpeed * FRAMES.attackMoveMult * dt);
       this.anim.walk += dt * 5;
     }
-    if (!this.hitDone && this.atkT >= this.atkDur * 0.35) {
+    if (!this.hitDone && this.atkT >= this.atkDur * FRAMES.hitFrac) {
       this.hitDone = true;
       let reach = 0.08 * (G.save.passives['sp_p_reach'] ?? 0);
       if (hasPower('u_dragonbone') && (this.mode === 'spear' || this.mode === 'halberd')) reach += 0.3;
       const finisher = this.combo === COMBOS[this.mode].length - 1;
-      const n = basicHit(this, this.mode, this.combo, this.aim, this.basicBranch(), this.weaponColor, reach, this.riposting ? 2.4 : 1, this.riposting);
+      const n = basicHit(this, this.mode, this.combo, this.aim, this.basicBranch(), this.weaponColor, reach, this.riposting ? FRAMES.riposteMult : 1, this.riposting);
       if (this.riposting) riposteFx(this);
       this.riposting = false;
       if (n > 0 && this.mode !== 'bow' && this.mode !== 'staff') fx.shake(1.5);
@@ -619,7 +620,7 @@ export class Player extends Actor {
       this.st = 'normal';
       this.lastAtkEnd = G.time;
       const list = COMBOS[this.mode];
-      if (this.combo >= list.length - 1) this.atkCd = 0.18 / this.stats.aspd;
+      if (this.combo >= list.length - 1) this.atkCd = FRAMES.finisherCooldown / this.stats.aspd;
       if (this.queued) {
         this.queued = false;
         this.startAttack(G.game.mouseAimFor(this));
@@ -690,7 +691,7 @@ export class Player extends Actor {
     const mastery = s.mastery[def.branch].rank;
     let mult = (1 + mastery * 0.01) * (1 + SKILL_RANK_DMG * (rank - 1));
     if (this.chainT > 0) {
-      mult *= 1.35;
+      mult *= 1 + FRAMES.switchBonus;
       this.chainT = 0;
       fx.number(this.x, this.y - 60, 'SWITCH COMBO +35%', '#7fe9ff', 14);
     }
@@ -702,7 +703,7 @@ export class Player extends Actor {
       connectBanner(this.chain, false);
     } else if (via === 'cancel') {
       this.chain = 1;
-      mult *= 1.15;
+      mult *= 1 + FRAMES.cancelBonus;
       connectBanner(1, true);
     } else this.chain = 1;
     this.connectT = 0;
@@ -795,10 +796,10 @@ export class Player extends Actor {
   /** Mounted Charge Slam: a galloping dash that ends in a knockback shockwave */
   private chargeSlam(aim: number): void {
     this.st = 'charge';
-    this.chargeT = 0.34;
+    this.chargeT = FRAMES.chargeDur;
     this.aim = aim;
     this.dir = dirFromAngle(aim);
-    this.iframes = Math.max(this.iframes, 0.3);
+    this.iframes = Math.max(this.iframes, FRAMES.chargeIframes);
     audio.play('dodge');
     fx.dust(this.x, this.y, 8);
   }

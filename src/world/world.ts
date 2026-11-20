@@ -13,7 +13,8 @@ import { Projectile } from '../entities/projectile';
 import { MONSTERS, BOSSES } from '../data/monsters';
 import { REALMS } from '../data/realms';
 import { COMPANION_BY_ID } from '../data/guilds';
-import { SECONDS_PER_HOUR, TILE } from '../data/constants';
+import { SECONDS_PER_HOUR, TILE, isNight } from '../data/constants';
+import { FRAMES } from '../data/framedata';
 import { itemDef, randomGear } from '../data/items';
 import { damage, tickDots } from '../systems/combat';
 import { Breakable } from '../entities/breakable';
@@ -87,9 +88,7 @@ export interface LootInst {
 
 let LOOT_ID = 1;
 
-export function isNight(h: number): boolean {
-  return h >= 20 || h < 5;
-}
+export { isNight };
 
 export class World {
   map!: GameMap;
@@ -1142,7 +1141,7 @@ export class World {
   private integrate(dt: number): void {
     const p = G.player;
     const all: Actor[] = [p, ...this.party, ...this.vanguard, ...this.adventurers, ...this.monsters];
-    const slamMin = G.save.keystones.includes('ks_spear') ? 105 : 150;
+    const slamMin = G.save.keystones.includes('ks_spear') ? FRAMES.slamSpeedKeystone : FRAMES.slamSpeed;
     for (const a of all) {
       if (Math.abs(a.kbx) + Math.abs(a.kby) > 2) {
         if (a.kind === 'monster' && (a as Monster).def.speed === 0) {
@@ -1152,7 +1151,7 @@ export class World {
         const speed = Math.hypot(a.kbx, a.kby);
         const res = this.map.move(a, a.kbx * dt, a.kby * dt, a.flying);
         if ((res.hitX || res.hitY) && a.team === 'enemy' && a.kind === 'monster' && a.kbFresh > 0 && a.slamCd <= 0 && speed >= slamMin && !a.dead) wallSlam(a, res.hitX, res.hitY);
-        const k = Math.max(0, 1 - 9 * dt);
+        const k = Math.max(0, 1 - FRAMES.kbDecay * dt);
         a.kbx *= k;
         a.kby *= k;
       } else a.kbx = a.kby = 0;

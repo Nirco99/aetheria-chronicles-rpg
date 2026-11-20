@@ -3,6 +3,7 @@
 import type {
   ActiveSkillDef, BuffSpec, Element, MorphKind, ProjSpec, RibbonSpec, SfxName, SkillAPI, SkillCaster, SkillHitOpts, StatusApply, TeleShape, ZoneSpec,
 } from '../types/game';
+import { FRAMES } from '../data/framedata';
 import { BRANCH_ELEMENT, MORPHS } from '../data/v3';
 import type { Actor } from '../entities/actor';
 import type { Monster } from '../entities/monster';
@@ -12,7 +13,7 @@ import { fx } from '../render/fx';
 import { audio } from '../engine/audio';
 import { angTo, dist, easeOutCubic, lerp, mix } from '../engine/util';
 
-export const PRE_MOTION = 0.12;
+export const PRE_MOTION = FRAMES.preMotion;
 
 interface Ev {
   t: number;

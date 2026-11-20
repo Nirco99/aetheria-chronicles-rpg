@@ -1,5 +1,6 @@
 // Global balance constants, visual palettes and progression curves.
 import type { Branch, CraftGrade, Element, GearColors, GemType, Rarity, WeaponType, ArmorSlot } from '../types/game';
+import { FRAMES } from './framedata';
 
 export const TILE = 32;
 export const WALL_H = 26;
@@ -11,18 +12,26 @@ export const UI_H = 720;
 export const MAX_LEVEL = 60;
 export const MAX_RANK = 50;
 export const MAX_TEMPER = 10;
+/** each tempering level multiplies a piece's flat stats by +7% */
+export const TEMPER_STEP = 0.07;
 export const HOTBAR_SIZE = 6;
 export const QUICK_KEYS = ['Z', 'X', 'C'];
 
-export const PARRY_WINDOW = 0.25;
-export const HITSTOP = 0.04;
-export const SHATTER_FREEZE = 0.12;
-export const BREAK_STUN = 4.0;
-export const BREAK_CRIT_MULT = 1.5;
-export const SWITCH_COST = 100;
-export const SWITCH_BONUS = 0.35;
+export const PARRY_WINDOW = FRAMES.parryWindow;
+export const HITSTOP = FRAMES.hitstop;
+export const SHATTER_FREEZE = FRAMES.shatterFreeze;
+export const BREAK_STUN = FRAMES.breakStun;
+export const BREAK_CRIT_MULT = FRAMES.breakCritMult;
+export const SWITCH_COST = FRAMES.switchCost;
+export const SWITCH_BONUS = FRAMES.switchBonus;
 /** real seconds per in-game hour */
 export const SECONDS_PER_HOUR = 60;
+/** Named Elites, roaming raid bosses and the Night Hunt bonus belong to these hours */
+export const NIGHT_START = 20;
+export const NIGHT_END = 5;
+export function isNight(h: number): boolean {
+  return h >= NIGHT_START || h < NIGHT_END;
+}
 export const DEATH_XP_LOSS = 0.15;
 export const DEATH_GOLD_FEE = 0.05;
 export const GEAR_CAPACITY = 120;
@@ -153,6 +162,15 @@ export function tierForLevel(level: number): number {
   if (level < 42) return 5;
   return 6;
 }
+
+/** Grand Coliseum tournament cups */
+export const CUPS = [
+  { name: 'Bronze Cup', level: 5, gold: 600, trophy: 'trophy_cup1' },
+  { name: 'Silver Cup', level: 12, gold: 1500, trophy: 'trophy_cup2' },
+  { name: 'Gold Cup', level: 22, gold: 3500, trophy: 'trophy_cup3' },
+  { name: 'Platinum Cup', level: 32, gold: 7000, trophy: 'trophy_cup4' },
+  { name: 'Champion Cup', level: 42, gold: 14000, trophy: 'trophy_cup5' },
+];
 
 export const CONTROLS: [string, string][] = [
   ['W A S D / Arrows', 'Move'],

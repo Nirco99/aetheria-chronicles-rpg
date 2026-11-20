@@ -13,7 +13,7 @@ import { ROLE_LINES, ROLE_TITLES, CITY_GOSSIP } from '../data/lore';
 import { MONSTERS } from '../data/monsters';
 import { CUPS, arena } from '../systems/arena';
 import { leaderboard, startAbyss } from '../systems/abyss';
-import { autoForgeGrade, craftRecipe, forge, forgeQualityBonus, gradeFromScore, maxCraftable, salvage, socketGem, temper, unsocketGem, canForge } from '../systems/crafting';
+import { autoForgeGrade, craftRecipe, forge, forgeQualityBonus, gradeFromScore, maxCraftable, salvage, socketGem, temper, temperBonus, unsocketGem, canForge } from '../systems/crafting';
 import { addGear, addItem, countItem, gearFull, isEquipped, removeItem } from '../systems/inventory';
 import { buyPrice, catIndex, CAT_NAMES, MARKET_CATS, onTrade, sellPrice, tickerLines, guildDiscountText } from '../systems/economy';
 import { acceptBounty, bountyReady, joinGuild, recruit, recruitBlocker, refreshBoard, turnIn } from '../systems/guilds';
@@ -231,10 +231,11 @@ function temperPane(b: HTMLElement): void {
     if (g.temper >= 10) right.append(section(gearTitle(g), h('div', { text: 'This item is fully tempered (+10). Its sparks burn gold.' })));
     else {
       const c = temperCost(g);
+      const odds = Math.min(1, c.chance + temperBonus());
       right.append(section(`${gearTitle(g)}  →  +${g.temper + 1}`,
         h('div', { html: gearTooltip(g, false) }),
         matList([[c.stone, c.stones]]),
-        h('div', { class: 'gold-line', text: `Fee: ${c.gold.toLocaleString()} G • Success chance: ${Math.round(c.chance * 100)}%${c.chance < 1 ? ' (failure never destroys the item)' : ''}` }),
+        h('div', { class: 'gold-line', text: `Fee: ${c.gold.toLocaleString()} G • Success chance: ${Math.round(odds * 100)}%${odds > c.chance ? ` (base ${Math.round(c.chance * 100)}% + bonuses)` : ''}${odds < 1 ? ' - failure never destroys the item' : ''}` }),
         btn('Temper', () => {
           const r = temper(g);
           G.ui.toast(r.msg, r.ok ? 'loot' : 'warn');

@@ -1,6 +1,7 @@
 // Full-Dive combat feel: the D..SSS Style meter, Skill Connect chains and the Finishing Nova,
 // Wall-Slam impacts, Counter-Riposte criticals and the parry time-freeze.
 import type { Actor } from '../entities/actor';
+import { FRAMES } from '../data/framedata';
 import { G } from '../core/state';
 import { STYLE_MAX, STYLE_RANKS } from '../data/v3';
 import { fx } from '../render/fx';
@@ -90,10 +91,10 @@ export const style = new StyleMeter();
 
 // ------------------------------------------------------------------ skill connect
 
-export const CONNECT_WINDOW = 0.3;
-export const CONNECT_MP = 0.7;
-export const CONNECT_STEP = 0.25;
-export const NOVA_CHAIN = 4;
+export const CONNECT_WINDOW = FRAMES.connectWindow;
+export const CONNECT_MP = FRAMES.connectMp;
+export const CONNECT_STEP = FRAMES.connectStep;
+export const NOVA_CHAIN = FRAMES.novaChain;
 
 export function connectFlash(a: Actor, color = '#7fe9ff'): void {
   fx.ring(a.x, a.y - 4, color, 6, 46, 0.3, 3);
@@ -117,7 +118,7 @@ export function connectBanner(step: number, viaCancel: boolean): void {
 }
 
 export function finishingNova(p: Actor, step: number): void {
-  const R = 170;
+  const R = FRAMES.novaRadius;
   fx.banner('FINISHING NOVA!', '#7fe9ff', `${step}-Skill Chain unleashed`, 64, 1.3);
   fx.flash('#bff3ff', 0.22);
   fx.shake(9);
@@ -130,7 +131,7 @@ export function finishingNova(p: Actor, step: number): void {
   const shape = { kind: 'circle' as const, x: p.x, y: p.y, r: R };
   for (const t of targetsOf(p)) {
     if (t.dead || !hitTest(shape, t.x, t.y, t.radius)) continue;
-    damage(p, t, { mult: 3.2, forceCrit: true, isSkill: true, source: 'skill', brk: 40, kb: 260, element: 'void', branch: null });
+    damage(p, t, { mult: FRAMES.novaMult, forceCrit: true, isSkill: true, source: 'skill', brk: FRAMES.novaBreak, kb: 260, element: 'void', branch: null });
   }
   G.save.counters.novas++;
   style.add(220, 'Finishing Nova');
@@ -140,10 +141,10 @@ export function finishingNova(p: Actor, step: number): void {
 
 /** called by the world integrator when a knocked-back actor collides with a wall */
 export function wallSlam(a: Actor, hitX: boolean, hitY: boolean): void {
-  a.slamCd = 0.8;
+  a.slamCd = FRAMES.slamCooldown;
   const src = a.lastHitBy;
   const keystone = G.save.keystones.includes('ks_spear');
-  const mult = keystone ? 0.9 : 0.45;
+  const mult = keystone ? FRAMES.slamDmgKeystone : FRAMES.slamDmg;
   const dmg = Math.max(1, Math.round(a.lastDmg * mult));
   const nx = hitX ? Math.sign(a.kbx) * a.hw : 0;
   const ny = hitY ? Math.sign(a.kby) * a.hh : 0;
@@ -153,8 +154,8 @@ export function wallSlam(a: Actor, hitX: boolean, hitY: boolean): void {
   damage(src, a, { flat: dmg, source: 'reflect', canBlock: false, noNumber: true });
   fx.number(a.x, a.y - 58, `WALL SLAM! ${dmg}`, '#ffb35c', 19);
   if (!a.dead) {
-    a.addStatus({ kind: 'stun', dur: 1.5 });
-    applyBreak(a, a.brkMax * 0.3);
+    a.addStatus({ kind: 'stun', dur: FRAMES.slamStun });
+    applyBreak(a, a.brkMax * FRAMES.slamBreak);
   }
   fx.shake(4.5);
   fx.dust(cx, cy, 14, '#b9ad98');
@@ -169,7 +170,7 @@ export function wallSlam(a: Actor, hitX: boolean, hitY: boolean): void {
 
 // ------------------------------------------------------------------ riposte
 
-export const RIPOSTE_WINDOW = 1.5;
+export const RIPOSTE_WINDOW = FRAMES.riposteWindow;
 
 export function riposteFx(p: Actor): void {
   fx.number(p.x, p.y - 64, 'COUNTER-RIPOSTE!', '#ffd166', 20);

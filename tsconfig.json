@@ -12,5 +12,5 @@
     "noFallthroughCasesInSwitch": true,
     "types": []
   },
-  "include": ["src"]
+  "include": ["src", "wiki-src"]
 }

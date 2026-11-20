@@ -6,37 +6,10 @@ import { G } from '../core/state';
 import { WEAPON_INFO } from '../data/constants';
 import { damage, hitTest, targetsOf } from './combat';
 import { fx } from '../render/fx';
+import { COMBOS } from '../data/framedata';
 import { audio } from '../engine/audio';
 
-export interface ComboHit {
-  shape: 'arc' | 'line';
-  arc: number;
-  a0: number;
-  a1: number;
-  mult: number;
-  kb: number;
-  dur: number;
-  brk: number;
-  hand: 0 | 1;
-  extra: number;
-}
-
-const h = (o: Partial<ComboHit>): ComboHit => ({ shape: 'arc', arc: 1.9, a0: -1, a1: 1, mult: 1, kb: 50, dur: 0.34, brk: 3, hand: 0, extra: 0, ...o });
-
-export const COMBOS: Record<WeaponMode, ComboHit[]> = {
-  sword: [h({ a0: -1.05, a1: 1.05 }), h({ a0: 1.05, a1: -1.05 }), h({ arc: 2.5, a0: -1.3, a1: 1.3, mult: 1.45, kb: 140, dur: 0.46, brk: 6, extra: 6 })],
-  dual: [
-    h({ a0: -1.0, a1: 0.9, mult: 0.75, dur: 0.24, hand: 0 }),
-    h({ a0: 1.0, a1: -0.9, mult: 0.75, dur: 0.24, hand: 1 }),
-    h({ a0: -1.2, a1: 1.0, mult: 0.8, dur: 0.24, hand: 0 }),
-    h({ arc: 2.4, a0: 1.3, a1: -1.3, mult: 1.15, kb: 120, dur: 0.36, hand: 1, brk: 5 }),
-  ],
-  spear: [h({ shape: 'line', arc: 26, mult: 1.1, dur: 0.38 }), h({ shape: 'line', arc: 26, mult: 1.1, dur: 0.38 }), h({ shape: 'line', arc: 32, mult: 1.5, kb: 140, dur: 0.48, extra: 16, brk: 6 })],
-  halberd: [h({ arc: 2.6, a0: -1.4, a1: 1.4, mult: 1.35, dur: 0.56, kb: 100, brk: 6 }), h({ arc: 2.6, a0: 1.4, a1: -1.4, mult: 1.75, dur: 0.66, kb: 180, brk: 9 })],
-  bow: [h({ dur: 0.42 })],
-  staff: [h({ dur: 0.5 })],
-  fists: [h({ arc: 1.3, a0: -0.5, a1: 0.5, mult: 0.55, dur: 0.3 }), h({ arc: 1.3, a0: 0.5, a1: -0.5, mult: 0.55, dur: 0.3 })],
-};
+export { COMBOS, type ComboHit } from '../data/framedata';
 
 export function reachOf(mode: WeaponMode, bonus = 0): number {
   const base = mode === 'fists' ? 36 : mode === 'dual' ? WEAPON_INFO.twinblade.reach : WEAPON_INFO[mode].reach;

@@ -6,7 +6,10 @@ import type { Player } from '../entities/player';
 import type { Monster } from '../entities/monster';
 import type { Companion } from '../entities/companion';
 import { G } from '../core/state';
-import { BREAK_CRIT_MULT, BREAK_STUN, HITSTOP, PARRY_WINDOW } from '../data/constants';
+import { BREAK_CRIT_MULT, BREAK_STUN, HITSTOP, PARRY_WINDOW, isNight } from '../data/constants';
+import { FRAMES } from '../data/framedata';
+import { MF_SOURCES, huntMasteryMf, lootSource, lootTable, rollGold, type LootCtx } from '../data/loot';
+import { dominantElement, elementAffinity } from '../data/monsters';
 import { randomGear, makeGear, GEAR_BASE_IDS, randomUnique } from '../data/items';
 import { tierForLevel } from '../data/constants';
 import { GEM_TYPES } from '../data/constants';
@@ -16,7 +19,8 @@ import { fx, NUM_COLORS } from '../render/fx';
 import { checkAwakenings, gainMastery, gainXp } from './progression';
 import type { Breakable } from '../entities/breakable';
 import { gaugeOf, paintGauge } from './reactions';
-import { onBlockPowers, onBreakPower, onEnemyKilled, onParryPowers, onPlayerHit, onPlayerHurt, powerDamageBonus, tryPhoenixRevive } from './powers';
+import { GAUGE_RULES } from '../data/v3';
+import { hasPower, onBlockPowers, onBreakPower, onEnemyKilled, onParryPowers, onPlayerHit, onPlayerHurt, powerDamageBonus, tryPhoenixRevive } from './powers';
 import { RIPOSTE_WINDOW, style } from './feel';
 import { checkAchievements } from './achievements';
 
@@ -79,12 +83,12 @@ export function targetsOf(a: Actor): Actor[] {
 export function applyBreak(t: Actor, amount: number): void {
   if (t.brkMax <= 0 || t.broken > 0 || t.dead || amount <= 0) return;
   t.brk += amount;
-  t.brkDelay = 3;
+  t.brkDelay = FRAMES.breakDelay;
   if (t.brk < t.brkMax) return;
   t.brk = t.brkMax;
   const m = t.kind === 'monster' ? (t as Monster) : null;
   const big = !!m && (m.isBoss || m.isElite);
-  t.broken = big ? BREAK_STUN : 2.5;
+  t.broken = big ? BREAK_STUN : FRAMES.breakStunSmall;
   if (m) {
     m.cancelAttack();
     if (m.def.id === 'b_wyrm') m.armored = false;
@@ -110,7 +114,7 @@ export function applyBreak(t: Actor, amount: number): void {
 function perfectParry(p: Player, src: Actor | null): void {
   const s = G.save;
   // 50ms time-freeze, ring shockwave, 30% MP & Stamina, a massive Break chunk and a riposte window
-  G.game.freeze(0.05);
+  G.game.freeze(FRAMES.parryFreeze);
   fx.ring(p.x, p.y, '#7fe9ff', 12, 130, 0.45, 7);
   fx.ring(p.x, p.y, '#ffffff', 6, 70, 0.3, 3);
   fx.sparks(p.x + Math.cos(p.aim) * 18, p.y - 18 + Math.sin(p.aim) * 10, '#bff3ff', 18, 240);
@@ -119,13 +123,13 @@ function perfectParry(p: Player, src: Actor | null): void {
   audio.play('parry');
   fx.shake(5);
   G.game.slowmo(0.22, 0.3);
-  p.mp = Math.min(p.stats.maxMp, p.mp + p.stats.maxMp * 0.3);
-  p.sta = Math.min(p.stats.maxSta, p.sta + p.stats.maxSta * 0.3);
+  p.mp = Math.min(p.stats.maxMp, p.mp + p.stats.maxMp * FRAMES.parryRestore);
+  p.sta = Math.min(p.stats.maxSta, p.sta + p.stats.maxSta * FRAMES.parryRestore);
   p.atkCd = 0;
   p.parryFlash = 0.25;
   p.riposteT = RIPOSTE_WINDOW;
   if (src && src.kind === 'monster') {
-    applyBreak(src, 40 + src.brkMax * 0.35);
+    applyBreak(src, FRAMES.parryBreakFlat + src.brkMax * FRAMES.parryBreakPct);
     src.hitstop = Math.max(src.hitstop, 0.2);
     src.kbx += Math.cos(p.aim) * 120;
     src.kby += Math.sin(p.aim) * 120;
@@ -191,6 +195,11 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
       elemental = true;
     }
     if (o.element && o.element !== 'none') elemental = true;
+    // species weakness / resistance to the hit's element (skill element, else the strongest gem or oil)
+    if (t.kind === 'monster') {
+      const el = o.element && o.element !== 'none' ? o.element : dominantElement(src.stats.elem);
+      if (el) dmg *= elementAffinity((t as Monster).def, el);
+    }
     if (src.kind === 'player') {
       const p = src as Player;
       dmg *= p.damageBonus(t, o.isSkill ?? false);
@@ -245,13 +254,13 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
       return 0;
     }
     if (p.blocking && front && o.canBlock !== false) {
-      const window = PARRY_WINDOW + 0.04 * (G.save.passives['sw_p_riposte'] ?? 0) + (G.save.keystones.includes('ks_shield') ? 0.08 : 0);
+      const window = PARRY_WINDOW + FRAMES.parryPerRiposteRank * (G.save.passives['sw_p_riposte'] ?? 0) + (G.save.keystones.includes('ks_shield') ? FRAMES.parryKeystone : 0);
       if (G.time - p.blockStart <= window) {
         perfectParry(p, src);
         return 0;
       }
       const shield = p.hasShield();
-      const red = Math.min(0.95, (shield ? 0.75 : 0.5) + p.stats.block);
+      const red = Math.min(FRAMES.blockCap, (shield ? FRAMES.blockReduceShield : FRAMES.blockReduce) + p.stats.block);
       const prevented = dmg * red;
       dmg -= prevented;
       const steadfast = G.save.passives['sh_p_steadfast'] ?? 0;
@@ -304,13 +313,14 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
   // knockback
   const kbBase = o.kb ?? (o.source === 'dot' ? 0 : 40 + (o.mult ?? 1) * 20);
   if (kbBase > 0) {
-    const resist = t.kind === 'monster' ? ((t as Monster).isBoss ? 0.08 : (t as Monster).isElite ? 0.35 : 1) : t.kind === 'player' ? 0.6 : 0.8;
+    const R = FRAMES.kbResist;
+    const resist = t.kind === 'monster' ? ((t as Monster).isBoss ? R.boss : (t as Monster).isElite ? R.elite : R.monster) : t.kind === 'player' ? R.player : R.companion;
     const ka = o.kbAngle ?? angTo(sx, sy, t.x, t.y);
     let kb = kbBase * resist;
     if (src && src.stats.elem.wind) kb += 60 * resist;
     t.kbx += Math.cos(ka) * kb;
     t.kby += Math.sin(ka) * kb;
-    t.kbFresh = 0.35;
+    t.kbFresh = FRAMES.kbFresh;
   }
   // numbers & sound
   if (!o.noNumber) {
@@ -333,7 +343,7 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
         fx.flash('#ff2a40', 0.08);
         (t as Player).onHurt();
         const frac = dmg / Math.max(1, t.stats.maxHp);
-        if (frac >= 0.12) t.iframes = Math.max(t.iframes, 0.35);
+        if (frac >= FRAMES.graceThreshold) t.iframes = Math.max(t.iframes, FRAMES.graceIframes);
         style.hurt(frac);
         onPlayerHurt(src, dmg);
       }
@@ -344,7 +354,8 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
 
   // break, status, procs
   if (o.source !== 'dot' && o.source !== 'reflect') {
-    const brk = (o.brk ?? (t.team === 'enemy' ? 2 : 0)) + (src && o.isSkill ? src.stats.brk : src ? src.stats.brk * 0.3 : 0);
+    let brk = (o.brk ?? (t.team === 'enemy' ? 2 : 0)) + (src && o.isSkill ? src.stats.brk : src ? src.stats.brk * 0.3 : 0);
+    if (src?.kind === 'player' && hasPower('s6_anvil')) brk *= 1.2;
     if (t.team === 'enemy') applyBreak(t, brk);
   }
   if (o.status) {
@@ -404,7 +415,7 @@ function paintHit(src: Actor, t: Actor, dmg: number, crit: boolean, o: HitOpts):
     return;
   }
   const elems = Object.keys(src.stats.elem) as Element[];
-  if (elems.length && Math.random() < 0.35) {
+  if (elems.length && Math.random() < GAUGE_RULES.gemChance) {
     const eg = gaugeOf(elems[Math.floor(Math.random() * elems.length)]);
     if (eg) {
       paintGauge(src, t, eg, dmg);
@@ -413,7 +424,7 @@ function paintHit(src: Actor, t: Actor, dmg: number, crit: boolean, o: HitOpts):
   }
   if (crit && src.kind === 'player') {
     const mode = (src as Player).mode;
-    if ((mode === 'sword' || mode === 'dual' || mode === 'spear' || mode === 'halberd') && Math.random() < 0.6) paintGauge(src, t, 'bleed', dmg);
+    if ((mode === 'sword' || mode === 'dual' || mode === 'spear' || mode === 'halberd') && Math.random() < GAUGE_RULES.critBleed) paintGauge(src, t, 'bleed', dmg);
   }
 }
 
@@ -472,37 +483,34 @@ export interface LootBundle {
   rarity: number;
 }
 
+/** loot context of a kill: level, Abyss floor and every Magic Find source in play */
+export function lootContext(m: Monster): LootCtx {
+  const s = G.save;
+  const floor = G.world.map.kind === 'abyss' ? G.world.map.floor : 0;
+  let mf = G.player ? G.player.stats.magicFind : 0;
+  mf += huntMasteryMf(m.def, s.bestiary[m.def.id] ?? 0);
+  if (G.world.map.kind === 'wild' && isNight(s.time)) mf += MF_SOURCES.night;
+  return { level: m.level, floor, mf, raid: m.raid };
+}
+
+/** rolls every line of the creature's loot table (src/data/loot.ts) */
 export function rollLoot(m: Monster): LootBundle {
-  const lvl = m.level;
+  const ctx = lootContext(m);
   const items: [string, number][] = [];
   const gear: GearItem[] = [];
-  const boss = m.isBoss;
-  const elite = m.isElite;
-  const floor = G.world.map.kind === 'abyss' ? G.world.map.floor : 0;
-  const gold = Math.round((3 + lvl * 1.6) * rnd(0.6, 1.4) * (boss ? 14 : elite ? 4 : 1) * (floor ? 1.3 : 1));
-  for (const d of m.def.drops) {
-    if (Math.random() < d.chance) items.push([d.id, rndi(d.min ?? 1, d.max ?? 1)]);
+  const gold = rollGold(m.def, m.level, ctx.floor, Math.random());
+  const src = lootSource(m.def, ctx.floor);
+  for (const l of lootTable(m.def, ctx)) {
+    if (!chance(l.chance)) continue;
+    const n = rndi(l.min, l.max);
+    if (l.kind === 'item' && l.item) items.push([l.item, n]);
+    else if (l.kind === 'gem') items.push(['gem_' + GEM_TYPES[rndi(0, GEM_TYPES.length - 1)], 1]);
+    else if (l.kind === 'gear') for (let i = 0; i < n; i++) gear.push(randomGear(m.level, src, ctx.mf));
+    else if (l.kind === 'unique') {
+      gear.push(randomUnique(tierForLevel(m.level)));
+      G.save.counters.uniquesFound++;
+    } else if (l.kind === 'mythicGear') gear.push(makeGear(GEAR_BASE_IDS[rndi(0, GEAR_BASE_IDS.length - 1)], 6, 5, { mythic: true }));
   }
-  if (!boss && !elite && lvl >= 5 && chance(0.04)) items.push(['enh_stone', 1]);
-  if (!boss && !elite && lvl >= 30 && chance(0.015)) items.push(['enh_greater', 1]);
-  if (elite && chance(0.5)) items.push(['enh_stone', rndi(1, 2)]);
-  const gemChance = boss ? 0.6 : elite ? 0.25 : 0.006;
-  if (chance(gemChance)) items.push(['gem_' + GEM_TYPES[rndi(0, 4)], 1]);
-  const src = floor >= 20 ? 3 : boss ? 2 : elite ? 1 : 0;
-  const nGear = boss ? 3 : elite ? (chance(0.4) ? 2 : 1) : chance(0.06) ? 1 : 0;
-  const mf = G.player ? G.player.stats.magicFind : 0;
-  for (let i = 0; i < nGear; i++) gear.push(randomGear(lvl, src, mf));
-  const uniqueChance = m.raid ? 0.45 : boss ? (floor >= 15 ? 0.18 : 0.1) : elite ? 0.015 : 0;
-  if (uniqueChance > 0 && chance(uniqueChance * (1 + mf))) {
-    gear.push(randomUnique(tierForLevel(lvl)));
-    G.save.counters.uniquesFound++;
-  }
-  if ((boss || elite) && chance(0.12)) items.push(['treasure_map', 1]);
-  if (floor >= 10) {
-    if (chance(boss || elite ? 0.5 : 0.04)) items.push(['relic_shard', 1]);
-    if (boss && chance(0.35)) items.push(['mythic_core', 1]);
-  }
-  if (boss && floor >= 30 && chance(0.15)) gear.push(makeGear(GEAR_BASE_IDS[rndi(0, GEAR_BASE_IDS.length - 1)], 6, 5, { mythic: true }));
   const rarity = gear.reduce((r, g) => Math.max(r, g.rarity), items.some(([id]) => id.startsWith('gem_')) ? 2 : 0);
   return { items, gear, gold, rarity };
 }

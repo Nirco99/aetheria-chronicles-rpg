@@ -70,6 +70,8 @@ export const GAUGE_COLORS: Record<GaugeKind, string> = {
   burn: '#ff6a3d', frost: '#7fe9ff', shock: '#ffe066', bleed: '#ff3b5c', venom: '#9be15d', aether: '#c18cff',
 };
 export const GAUGE_DUR = 4.5;
+/** a non-elemental hit paints one of the weapon's gem / oil elements with `gemChance`; melee critical hits paint Bleed with `critBleed` */
+export const GAUGE_RULES = { gemChance: 0.35, critBleed: 0.6 };
 
 export const REACTIONS: ReactionDef[] = [
   { id: 'melt', name: 'MELT', a: 'burn', b: 'frost', color: '#ffb35c', desc: 'Burn + Frost: the hit detonates for a 2.2x elemental burst.' },
@@ -80,6 +82,21 @@ export const REACTIONS: ReactionDef[] = [
   { id: 'singularity', name: 'AETHER SINGULARITY', a: 'aether', b: null, color: '#c18cff', desc: 'Aether + any gauge: a gravity vortex drags enemies together and crushes them.' },
 ];
 export const REACTION_BY_ID: Record<string, ReactionDef> = Object.fromEntries(REACTIONS.map((r) => [r.id, r]));
+
+/** exact reaction numbers used by systems/reactions.ts (damage values are multiples of the triggering hit) */
+export const REACTION_RULES = {
+  /** extra burst on the target: the hit itself plus 1.2x more = a 2.2x total (x1.6 with Dragonlord Inferno) */
+  melt: { burst: 1.2, setBonus: 1.6 },
+  /** shrapnel to every enemy within `radius`, half that to the target, and 35% of the target's Break Bar */
+  shatter: { mult: 0.6, radius: 95, self: 0.5, breakPct: 0.35, kb: 90, uniqueBonus: 1.5, setBonus: 1.8 },
+  overload: { mult: 0.8, radius: 110, kb: 240, self: 0.5, selfKb: 200, setBonus: 1.6 },
+  /** armor collapse: -40% DEF for 8 s */
+  superconduct: { shred: 0.4, dur: 8 },
+  /** every status and gauge on the target spreads within `radius`; Venom poisons everyone it touches */
+  tempest: { radius: 150, poisonDur: 4, selfPoisonDur: 5, selfPoisonPower: 1.2 },
+  /** a void vortex: `mult` x the caster's damage every `tick` s for `dur` s, pulling at `pull` px/s */
+  singularity: { radius: 130, dur: 2.4, tick: 0.4, mult: 0.35, pull: 170 },
+};
 
 // ------------------------------------------------------------------ affixes
 
@@ -272,12 +289,12 @@ export const MOUNTS: MountDef[] = [
 export const MOUNT_BY_ID: Record<string, MountDef> = Object.fromEntries(MOUNTS.map((m) => [m.id, m]));
 
 export const PETS: PetDef[] = [
-  { id: 'pet_ember', name: 'Ember Sprite', element: 'fire', color: '#ff6a3d', color2: '#ffd166', desc: 'Loots for you and spits fire bolts that apply Burn.', price: 600, req: 1 },
-  { id: 'pet_frost', name: 'Frost Wisp', element: 'frost', color: '#7fe9ff', color2: '#ffffff', desc: 'Loots for you and fires frost motes that apply Frost.', price: 900, req: 6 },
-  { id: 'pet_spark', name: 'Spark Kit', element: 'lightning', color: '#ffe066', color2: '#fff7c2', desc: 'Loots for you and zaps enemies with Shock.', price: 1500, req: 12 },
-  { id: 'pet_gale', name: 'Gale Finch', element: 'wind', color: '#57e389', color2: '#d6ffe6', desc: 'Loots for you and slices with wind that causes Bleed.', price: 2400, req: 18 },
-  { id: 'pet_bloom', name: 'Bloom Sprout', element: 'poison', color: '#9be15d', color2: '#f6a5ff', desc: 'Loots for you and spits spores that apply Venom.', price: 3600, req: 26 },
-  { id: 'pet_moth', name: 'Void Moth', element: 'void', color: '#a970ff', color2: '#ff9ad0', desc: 'Loots for you and fires void dust that applies Aether.', price: 6000, req: 36 },
+  { id: 'pet_ember', name: 'Ember Sprite', element: 'fire', color: '#ff6a3d', color2: '#ffd166', desc: 'Loots for you (+4% Magic Find) and spits fire bolts that apply Burn.', price: 600, req: 1, mf: 0.04 },
+  { id: 'pet_frost', name: 'Frost Wisp', element: 'frost', color: '#7fe9ff', color2: '#ffffff', desc: 'Loots for you (+5% Magic Find) and fires frost motes that apply Frost.', price: 900, req: 6, mf: 0.05 },
+  { id: 'pet_spark', name: 'Spark Kit', element: 'lightning', color: '#ffe066', color2: '#fff7c2', desc: 'Loots for you (+6% Magic Find) and zaps enemies with Shock.', price: 1500, req: 12, mf: 0.06 },
+  { id: 'pet_gale', name: 'Gale Finch', element: 'wind', color: '#57e389', color2: '#d6ffe6', desc: 'Loots for you (+7% Magic Find) and slices with wind that causes Bleed.', price: 2400, req: 18, mf: 0.07 },
+  { id: 'pet_bloom', name: 'Bloom Sprout', element: 'poison', color: '#9be15d', color2: '#f6a5ff', desc: 'Loots for you (+8% Magic Find) and spits spores that apply Venom.', price: 3600, req: 26, mf: 0.08 },
+  { id: 'pet_moth', name: 'Void Moth', element: 'void', color: '#a970ff', color2: '#ff9ad0', desc: 'Loots for you (+10% Magic Find) and fires void dust that applies Aether.', price: 6000, req: 36, mf: 0.1 },
 ];
 export const PET_BY_ID: Record<string, PetDef> = Object.fromEntries(PETS.map((p) => [p.id, p]));
 

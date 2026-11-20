@@ -477,6 +477,9 @@ export interface MonsterDef {
   title?: string;
   humanoid?: HumanoidStyle;
   keepDistance?: number;
+  /** elements that deal x1.3 / x0.6 damage to this creature */
+  weak?: Element[];
+  resist?: Element[];
 }
 
 export interface BossPhase {
@@ -978,6 +981,8 @@ export interface PetDef {
   desc: string;
   price: number;
   req: number;
+  /** Magic Find while this pet is your active companion pet */
+  mf: number;
 }
 
 export interface FishDef {

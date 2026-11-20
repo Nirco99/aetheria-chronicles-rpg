@@ -3,30 +3,49 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Aetheria Strategy Wiki</title>
-    <meta name="description" content="Bilingual (English / Hebrew) strategy guide and wiki for Aetheria Chronicles: Sword &amp; Forge." />
+    <title>Aetheria Codex &amp; Database</title>
+    <meta name="description" content="The official bilingual (English / Hebrew) strategy compendium for Aetheria Chronicles: Sword &amp; Forge - every item, monster, drop rate, build and map, generated straight from the game's source code." />
+    <meta name="theme-color" content="#070b16" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307101f'/%3E%3Cpath d='M32 6l5 30h-10z' fill='%237fe9ff'/%3E%3Crect x='20' y='36' width='24' height='5' rx='2' fill='%23f2c14e'/%3E%3Crect x='29' y='41' width='6' height='14' rx='2' fill='%238a5a2b'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <a class="skip" href="#main" id="skip">Skip to content</a>
     <header class="top">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">&#9876;</div>
-        <div>
-          <div class="brand-title" id="brand-title">Aetheria Chronicles</div>
-          <div class="brand-sub" id="brand-sub">Sword &amp; Forge &mdash; Strategy Wiki</div>
+      <div class="top-row">
+        <a class="brand" href="#home" aria-label="Aetheria Codex home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 64 64" width="40" height="40"><defs><linearGradient id="bm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8fbff"/><stop offset="1" stop-color="#7fe9ff"/></linearGradient></defs><path d="M32 4l6 34H26z" fill="url(#bm)"/><rect x="18" y="37" width="28" height="6" rx="2.5" fill="#f2c14e"/><rect x="29" y="43" width="6" height="15" rx="2.5" fill="#8a5a2b"/><circle cx="32" cy="60" r="3" fill="#f2c14e"/></svg>
+          </span>
+          <span class="brand-text">
+            <span class="brand-title" id="brand-title">Aetheria Codex</span>
+            <span class="brand-sub" id="brand-sub">Database &amp; Strategy Compendium</span>
+          </span>
+        </a>
+        <div class="top-tools">
+          <label class="gsearch" id="gsearch-wrap">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input type="search" id="gsearch" autocomplete="off" spellcheck="false" />
+          </label>
+          <div class="lang" role="group" aria-label="Language">
+            <button type="button" id="lang-en" class="lang-btn" data-lang="en">English</button>
+            <button type="button" id="lang-he" class="lang-btn" data-lang="he" lang="he">עברית</button>
+          </div>
         </div>
       </div>
-      <div class="lang" role="group" aria-label="Language">
-        <button type="button" id="lang-en" class="lang-btn" data-lang="en">English</button>
-        <button type="button" id="lang-he" class="lang-btn" data-lang="he" lang="he">עברית</button>
-      </div>
+      <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+      <div class="gresults" id="gresults" hidden></div>
     </header>
-    <div class="layout">
-      <nav class="side" id="nav" aria-label="Sections"></nav>
-      <main class="content" id="content"></main>
-    </div>
+    <main class="page-root" id="main" tabindex="-1"></main>
     <footer class="foot" id="foot"></footer>
+    <div class="tip" id="tip" role="tooltip" hidden></div>
+    <script src="wiki-data.js"></script>
+    <script src="wiki-engine.js"></script>
     <script src="wiki.js"></script>
+    <script src="wiki-db.js"></script>
+    <script src="wiki-viz.js"></script>
+    <script src="wiki-builds.js"></script>
+    <script src="wiki-guide.js"></script>
+    <script>Wiki.start();</script>
   </body>
 </html>
