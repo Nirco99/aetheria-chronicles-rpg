@@ -3,8 +3,10 @@ import type {
   ArmorSlot, CraftGrade, FurnitureDef, FurnitureKind, GearColors, GearItem, ItemDef, MarketCategory,
   Rarity, StatBlock, WeaponType, GemType,
 } from '../types/game';
+import type { Affix, AffixKind } from '../types/game';
 import { GRADE_INFO, RARITY_MULT, TIERS, tierForLevel } from './constants';
 import { uid, weighted } from '../engine/util';
+import { AFFIXES, AFFIX_COUNT, LEGENDARY_POWERS, SETS, SET_BY_ID, UNIQUES, UNIQUE_BY_ID, type AffixDef } from './v3';
 
 const I: Record<string, ItemDef> = {};
 function def(d: ItemDef): void {
@@ -85,6 +87,24 @@ const mats: [string, string, number, string, ItemDef['icon'], string][] = [
   ['honey', 'Cloud Honey', 18, '#ffc94a', 'flask', 'Golden honey from Aetherion sky-hives.'],
 ];
 for (const [id, name, value, color, icon, desc] of mats) def({ id, name, cat: 'material', value, color, icon, desc });
+
+// ------------------------------------------------------------------ v3: fish & treasure maps
+const fishes: [string, string, number, string, string][] = [
+  ['fish_minnow', 'Plains Minnow', 6, '#c9d6c0', 'A tiny, quick fish from the Emerald Plains streams.'],
+  ['fish_goldcarp', 'Golden Carp', 60, '#ffc94a', 'A lucky carp with scales like coins. Collectors adore it.'],
+  ['fish_lotus', 'Lotus Koi', 22, '#ff9ad0', 'A koi that sleeps under lotus pads.'],
+  ['fish_glowtrout', 'Glowcap Trout', 70, '#b8ff7a', 'Its fins glow faintly in murky water.'],
+  ['fish_rooteel', 'Ancient Root-Eel', 600, '#6b8f4e', 'Legendary. As old as the Arch-Treant itself.'],
+  ['fish_magmaw', 'Magmaw', 90, '#ff7a3d', 'Swims in lava. Handle with tongs.'],
+  ['fish_cinder', 'Cinder Pike', 220, '#ff4f3a', 'A predator wreathed in sparks.'],
+  ['fish_icecod', 'Glacier Cod', 40, '#bfe6ff', 'Frozen solid the instant it leaves the water.'],
+  ['fish_crystal', 'Crystal Char', 260, '#c4e8ff', 'Transparent as glass, sharp as ice.'],
+  ['fish_skyray', 'Sky Ray', 140, '#c69bff', 'Glides through the cloud-sea around Aetherion.'],
+  ['fish_starwhale', 'Starwhale Calf', 1800, '#ffd1f0', 'Mythic. A sky-whale calf worth a fortune to collectors.'],
+];
+for (const [id, name, value, color, desc] of fishes) def({ id, name, cat: 'material', value, color, icon: 'meat', desc });
+def({ id: 'treasure_map', name: 'Ancient Treasure Map', cat: 'consumable', value: 300, color: '#e8c07a', icon: 'relic', desc: 'Use it to reveal a dig site in the wilds. Find the X on your minimap and press E to dig.' });
+def({ id: 'food_platter', name: "Angler's Platter", cat: 'food', value: 160, color: '#9ad1ff', icon: 'dish', desc: '+10% ATK, +10% MAG and +12% Magic Find for 8 minutes.', effect: { buff: { id: 'food', name: "Angler's Platter", dur: 480, color: '#9ad1ff', stats: { atkPct: 0.1, magPct: 0.1, magicFind: 0.12 } } } });
 
 // ------------------------------------------------------------------ consumables
 def({ id: 'pot_hp_s', name: 'Minor Healing Potion', cat: 'consumable', value: 20, color: '#ff5d6c', icon: 'potion', desc: 'Restores 30% HP.', effect: { heal: 0.3 } });
@@ -241,7 +261,7 @@ export function gearName(base: GearBase, tier: number, mythic: boolean): string 
   return mythic ? `Mythic ${nm}` : nm;
 }
 
-const FRACTIONAL: (keyof StatBlock)[] = ['crit', 'critDmg', 'aspd', 'move', 'block', 'regen'];
+export const FRACTIONAL: (keyof StatBlock)[] = ['crit', 'critDmg', 'aspd', 'move', 'block', 'regen', 'atkPct', 'defPct', 'magPct', 'hpPct', 'xpPct', 'lifesteal', 'skillDmg', 'cdr', 'magicFind'];
 
 export function scaleStats(s: StatBlock, tier: number): StatBlock {
   const out: StatBlock = {};
@@ -260,6 +280,10 @@ export interface GearOpts {
   mythic?: boolean;
   forgedBy?: string;
   statMult?: number;
+  /** v3: roll affixes / legendary power (default true) */
+  affixes?: boolean;
+  set?: string;
+  unique?: string;
 }
 
 export function makeGear(baseId: string, tier: number, rarity: Rarity, o: GearOpts = {}): GearItem {
@@ -294,7 +318,70 @@ export function makeGear(baseId: string, tier: number, rarity: Rarity, o: GearOp
     forgedBy: o.forgedBy,
     mythic,
     colors: { ...colors },
+    affixes: o.affixes === false ? [] : rollAffixes(b.kind, t, mythic ? 5 : rarity),
+    power: o.affixes !== false && (mythic || rarity >= 4) ? LEGENDARY_POWERS[Math.floor(Math.random() * LEGENDARY_POWERS.length)].id : undefined,
+    set: o.set,
+    unique: o.unique,
   };
+}
+
+// ------------------------------------------------------------------ v3: affixes, sets, uniques
+
+function affixPool(kind: 'weapon' | 'armor'): AffixDef[] {
+  return AFFIXES.filter((a) => (kind === 'weapon' ? a.weapon : a.armor));
+}
+
+export function rollAffix(kind: 'weapon' | 'armor', tier: number, exclude: AffixKind[] = []): Affix {
+  const pool = affixPool(kind).filter((a) => !exclude.includes(a.kind));
+  const a = weighted(pool, (x) => x.w);
+  const r = a.min + Math.random() * (a.max - a.min);
+  const value = a.flat ? Math.max(1, Math.round(r * (1 + tier * 0.9))) : +(r * (1 + tier * 0.06)).toFixed(4);
+  return { kind: a.kind, value };
+}
+
+export function rollAffixes(kind: 'weapon' | 'armor', tier: number, rarity: number): Affix[] {
+  const out: Affix[] = [];
+  const n = AFFIX_COUNT[rarity] ?? 0;
+  for (let i = 0; i < n; i++) out.push(rollAffix(kind, tier, out.map((a) => a.kind)));
+  return out;
+}
+
+export function affixLabel(a: Affix): string {
+  const d = AFFIXES.find((x) => x.kind === a.kind);
+  if (!d) return a.kind;
+  return d.flat ? `+${a.value} ${d.label}` : `+${(a.value * 100).toFixed(a.value < 0.1 ? 1 : 0)}% ${d.label}`;
+}
+
+export function makeSetPiece(setId: string, pieceIdx: number, tier: number, rarity: Rarity): GearItem {
+  const set = SET_BY_ID[setId];
+  const piece = set.pieces[pieceIdx % set.pieces.length];
+  const r = Math.max(3, rarity) as Rarity;
+  return makeGear(piece.baseId, tier, r, { name: piece.name, colors: { ...set.colors }, set: set.id, statMult: 1.08 });
+}
+
+export function randomSetPiece(tier: number, rarity: Rarity): GearItem {
+  const set = SETS[Math.floor(Math.random() * SETS.length)];
+  return makeSetPiece(set.id, Math.floor(Math.random() * set.pieces.length), tier, rarity);
+}
+
+export function makeUnique(uniqueId: string, tier: number): GearItem {
+  const u = UNIQUE_BY_ID[uniqueId];
+  const g = makeGear(u.baseId, tier, 4, { name: u.name, colors: { ...u.colors }, unique: u.id, statMult: 1.15, affixes: false });
+  g.affixes = rollAffixes(g.kind, g.tier, 3);
+  g.power = u.power;
+  for (const k of Object.keys(u.stats) as (keyof StatBlock)[]) {
+    const v = u.stats[k] ?? 0;
+    g.base[k] = (g.base[k] ?? 0) + (FRACTIONAL.includes(k) ? v : Math.round(v * (1 + tier * 0.5)));
+  }
+  if (g.kind === 'weapon') {
+    g.sockets = Math.max(g.sockets, 2);
+    g.gems = new Array(g.sockets).fill(null);
+  }
+  return g;
+}
+
+export function randomUnique(tier: number): GearItem {
+  return makeUnique(UNIQUES[Math.floor(Math.random() * UNIQUES.length)].id, tier);
 }
 
 /** Final stat contribution of a piece of gear, including rarity, craft grade and tempering. */
@@ -308,6 +395,7 @@ export function gearStats(g: GearItem): StatBlock {
     if (FRACTIONAL.includes(k)) out[k] = +(v * (v > 0 ? rm * gm : 1)).toFixed(4);
     else out[k] = Math.round(v * (v > 0 ? rm * gm * tm : 1));
   }
+  for (const a of g.affixes ?? []) out[a.kind] = +((out[a.kind] ?? 0) + a.value * (FRACTIONAL.includes(a.kind) ? 1 : tm)).toFixed(4);
   return out;
 }
 
@@ -342,12 +430,14 @@ export function rollRarity(source: number): Rarity {
   return idx as Rarity;
 }
 
-export function randomGear(level: number, source: number): GearItem {
+export function randomGear(level: number, source: number, magicFind = 0): GearItem {
   const tier = tierForLevel(level);
   const ids = GEAR_BASE_IDS;
   const baseId = ids[Math.floor(Math.random() * ids.length)];
-  const rarity = rollRarity(source);
+  let rarity = rollRarity(source);
+  if (magicFind > 0 && rarity < 4 && Math.random() < magicFind * 0.35) rarity = (rarity + 1) as Rarity;
   if (rarity === 5) return makeGear(baseId, 6, 5, { mythic: true });
+  if (rarity >= 3 && Math.random() < (source >= 1 ? 0.3 : 0.15)) return randomSetPiece(tier, rarity);
   return makeGear(baseId, tier, rarity);
 }
 

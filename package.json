@@ -1,8 +1,8 @@
 {
   "name": "aetheria-chronicles-rpg",
-  "productName": "Aetheria Chronicles: Sword & Forge",
-  "version": "1.0.0",
-  "description": "A 60 FPS top-down oblique real-time action RPG with sword skills, deep blacksmithing, housing, guilds and an infinite abyss - TypeScript + Canvas 2D + Web Audio + Electron.",
+  "productName": "Aetheria Chronicles",
+  "version": "3.0.0",
+  "description": "Aetheria Chronicles: Sword & Forge - Full-Dive Desktop Edition. A standalone 60 FPS top-down oblique action RPG for Windows with Skill Connect combat, Wall-Slam physics, elemental reactions, a Relic Codex, simulated adventurers and 6-hero raids.",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -11,16 +11,58 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
+    "icon": "node scripts/make-icon.mjs",
     "electron:dev": "concurrently -k -n vite,electron -c magenta,cyan \"vite\" \"wait-on tcp:127.0.0.1:5173 && electron . --dev\"",
     "electron": "electron .",
-    "start": "npm run build && electron ."
+    "start": "npm run build && electron .",
+    "selftest": "npm run build && electron . --selftest",
+    "pack:win": "npm run icon && electron-builder --win --dir",
+    "dist:win": "npm run icon && npm run build && electron-builder --win --dir"
   },
   "devDependencies": {
     "concurrently": "^9.2.5",
     "electron": "^39.8.10",
+    "electron-builder": "^26.18.0",
     "typescript": "~5.8.3",
     "vite": "^6.4.6",
     "wait-on": "^8.0.5"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "author": "Aetheria Chronicles contributors",
+  "homepage": "https://nirco99.github.io/aetheria-chronicles-rpg/",
+  "build": {
+    "appId": "com.aetheria.chronicles",
+    "productName": "Aetheria Chronicles",
+    "copyright": "Copyright (c) 2026 Aetheria Chronicles contributors",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "build/icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "wiki",
+        "to": "wiki"
+      }
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "executableName": "Aetheria Chronicles"
+    }
+  }
 }

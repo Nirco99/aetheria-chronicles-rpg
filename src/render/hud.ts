@@ -1,4 +1,5 @@
 // Canvas HUD (drawn in a 720px-tall logical space).
+import { drawPartyFrames, drawV3Hud } from './v3hud';
 import type { Renderer } from './renderer';
 import { G } from '../core/state';
 import { BRANCH_INFO, HOTBAR_SIZE, QUICK_KEYS, UI_H, xpToNext } from '../data/constants';
@@ -100,14 +101,8 @@ export function drawHud(ctx: CanvasRenderingContext2D, r: Renderer, t: number): 
     text(ctx, st.kind.toUpperCase(), bx + 2, 112, 9, '#ff9aa6');
     bx += 44;
   }
-  // companion
-  const c = world.companion;
-  if (c) {
-    panel(ctx, 12, 130, 200, 34);
-    text(ctx, c.def.name, 22, 141, 11, '#7fe9ff');
-    if (c.dead) text(ctx, `Knocked out (${Math.ceil(c.downT)}s)`, 200, 141, 10, '#ff9aa6', 'right');
-    bar(ctx, 22, 150, 180, 7, c.dead ? 0 : c.hp / c.stats.maxHp, '#4cd97b');
-  }
+  // companions (party of two)
+  drawPartyFrames(ctx);
   // ---------------------------------------------------------------- minimap & clock
   const mmW = 180;
   const mmH = 132;
@@ -139,7 +134,29 @@ export function drawHud(ctx: CanvasRenderingContext2D, r: Renderer, t: number): 
   }
   for (const e of m.exits) dot(e.x + e.w / 2, e.y + e.h / 2, '#5ee6a0', 3);
   for (const mo of world.monsters) if (!mo.dead && Math.hypot(mo.x - p.x, mo.y - p.y) < 700) dot(mo.x, mo.y, mo.isBoss || mo.isElite ? '#ff9a3d' : '#ff4d5e', mo.isBoss || mo.isElite ? 3 : 1.6);
-  if (c && !c.dead) dot(c.x, c.y, '#7fe9ff', 2.4);
+  for (const pc of world.party) if (!pc.dead) dot(pc.x, pc.y, '#7fe9ff', 2.4);
+  for (const v of world.vanguard) if (!v.dead) dot(v.x, v.y, '#ffd27a', 2.2);
+  for (const a of world.adventurers) dot(a.x, a.y, a.helpNeeded ? '#ff9a3d' : '#5ee6a0', a.helpNeeded ? 3 : 1.8);
+  for (const f of m.fishSpots) dot(f.wx, f.wy, '#7fc8ff', 2);
+  for (const pd of m.pads) dot(pd.x, pd.y, '#7fe9ff', 1.8);
+  if (world.caravan) dot(world.caravan.x, world.caravan.y, '#ffd166', 3.2);
+  if (world.event && !world.event.done) dot(world.event.x, world.event.y, '#c9a8ff', 3.6);
+  for (const mo of world.monsters) if (mo.raid && !mo.dead) dot(mo.x, mo.y, '#ff2a40', 4.2);
+  if (m.kind === 'wild') {
+    for (const hu of s.hunts) {
+      if (hu.found || hu.realm !== m.realm) continue;
+      const hx = ox + (hu.x / TILE) * scale;
+      const hy2 = oy + (hu.y / TILE) * scale;
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(hx - 3, hy2 - 3);
+      ctx.lineTo(hx + 3, hy2 + 3);
+      ctx.moveTo(hx + 3, hy2 - 3);
+      ctx.lineTo(hx - 3, hy2 + 3);
+      ctx.stroke();
+    }
+  }
   dot(p.x, p.y, '#ffffff', 3);
   const night = isNight(s.time);
   const wname = { clear: night ? 'Clear night' : 'Clear', rain: 'Rain', storm: 'Thunderstorm', blizzard: 'Blizzard', ash: 'Ember Ash' }[m.outdoor ? world.weather : 'clear'];
@@ -273,7 +290,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, r: Renderer, t: number): 
     text(ctx, QUICK_KEYS[i], x + 5, hy + 11, 9, '#ffd166');
   }
   // switch gauge
-  if (c) {
+  if (world.party.length) {
     const gw = total;
     const gy = hy - 22;
     const full = p.switchGauge >= 100;
@@ -293,6 +310,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, r: Renderer, t: number): 
     panel(ctx, W / 2 - tw / 2, hy - 70, tw, 26);
     text(ctx, label, W / 2, hy - 57, 13, '#ffe9b0', 'center');
   }
+  drawV3Hud(ctx, W, H, t);
   // decorator overlay
   if (G.game.decorating) drawDecor(ctx, r, k);
   // fps

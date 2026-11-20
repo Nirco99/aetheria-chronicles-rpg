@@ -29,8 +29,7 @@ export function gainXp(n: number): void {
     fx.burst(p.x, p.y, '#ffd166', 28, 170);
     fx.ring(p.x, p.y, '#ffd166', 10, 120, 0.6);
     audio.play('levelup');
-    const c = G.world.companion;
-    if (c) c.syncLevel();
+    for (const c of G.world.party) c.syncLevel();
   }
 }
 

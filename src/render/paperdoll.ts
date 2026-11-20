@@ -1,7 +1,8 @@
 // Multi-layer procedural "paper-doll" renderer. Every equipped item visibly changes the
 // character: 1 shadow & aura, 2 cape, 3 body & boots, 4 chest armor, 5 head/hair/helmet,
 // 6 off-hand (shield / second blade / quiver / rune orb), 7 main-hand weapon.
-import type { Anim, CompanionDef, CompanionSave, Dir, HumanoidStyle, NpcRole, SaveData } from '../types/game';
+import type { Anim, CompanionDef, CompanionSave, Dir, GearItem, HumanoidStyle, NpcRole, SaveData } from '../types/game';
+import { GEAR_BASES } from '../data/items';
 import { drawShield, drawTemperSparks, drawWeapon, visOf, type GearVis } from './gear';
 import { EYE_COLORS, HAIR_COLORS, RARITY_COLORS, SKIN_TONES } from '../data/constants';
 import { activeSet, gemColor } from '../systems/stats';
@@ -39,17 +40,89 @@ export interface DrawOpts {
   shadow?: boolean;
   barrier?: number;
   ghosts?: boolean;
+  /** v3: riding a mount (legs straddle the saddle) */
+  seated?: boolean;
+}
+
+// ------------------------------------------------------------------ v3: blade trails & spring capes
+
+export interface TrailPt {
+  hx: number;
+  hy: number;
+  tx: number;
+  ty: number;
+  t: number;
+}
+const TRAILS = new WeakMap<Anim, TrailPt[]>();
+const CAPES = new WeakMap<Anim, { x: number; y: number; vx: number; vy: number; t: number }>();
+let capeTip = { x: 0, y: 0 };
+
+/** last 12 hilt / tip samples of a melee swing, in world space (for the trail mesh) */
+export function bladeTrail(A: Anim): TrailPt[] {
+  return TRAILS.get(A) ?? [];
+}
+
+function recordTrail(A: Anim, hx: number, hy: number, tx: number, ty: number, t: number, active: boolean): void {
+  let tr = TRAILS.get(A);
+  if (!tr) {
+    tr = [];
+    TRAILS.set(A, tr);
+  }
+  if (active) {
+    const last = tr[tr.length - 1];
+    if (!last || last.t !== t) tr.push({ hx, hy, tx, ty, t });
+    if (tr.length > 12) tr.shift();
+  }
+  while (tr.length && t - tr[0].t > 0.14) tr.shift();
+}
+
+/** damped spring that drags the cape tip behind the wearer's velocity */
+function updateCape(A: Anim, vx: number, vy: number, t: number): { x: number; y: number } {
+  let c = CAPES.get(A);
+  if (!c) {
+    c = { x: 0, y: 0, vx: 0, vy: 0, t };
+    CAPES.set(A, c);
+  }
+  const dt = Math.min(0.05, Math.max(0, t - c.t));
+  c.t = t;
+  if (dt > 0) {
+    const tx = (-vx / 150) * 5 + Math.sin(t * 1.9) * 0.6;
+    const ty = -Math.min(1, Math.hypot(vx, vy) / 150) * 3;
+    c.vx += ((tx - c.x) * 70 - c.vx * 9) * dt;
+    c.vy += ((ty - c.y) * 70 - c.vy * 9) * dt;
+    c.x += c.vx * dt;
+    c.y += c.vy * dt;
+  }
+  return c;
 }
 
 // ------------------------------------------------------------------ look builders
+
+/** applies a wardrobe (transmog) look and the active dyes to an equipped piece's visuals */
+function styled(save: SaveData, slot: 'mainA' | 'head' | 'chest' | 'boots' | 'cloak', g: GearItem | null, gem: string | null = null): GearVis | null {
+  let v = visOf(g, gem);
+  if (!v || !g) return v;
+  const key = save.transmog?.[slot];
+  if (key) {
+    const [baseId, style, tier, main, accent, trim, glow] = key.split('|');
+    const b = GEAR_BASES[baseId];
+    const ok = slot === 'mainA' ? !!b && b.wtype === g.wtype : !!b && b.aslot === g.aslot;
+    if (ok) v = { ...v, style: Number(style), tier: Number(tier), main, accent, trim, glow };
+  }
+  if (slot !== 'mainA' && save.dyes) {
+    if (save.dyes.main) v = { ...v, main: save.dyes.main };
+    if (save.dyes.accent) v = { ...v, accent: save.dyes.accent };
+  }
+  return v;
+}
 
 export function buildPlayerLook(save: SaveData): Look {
   const { main, off } = activeSet(save);
   const a = save.appearance;
   return {
     skin: SKIN_TONES[a.skin], hair: HAIR_COLORS[a.hairColor].color, hairStyle: a.hairStyle, eyes: EYE_COLORS[a.eyeColor].color,
-    head: visOf(save.equip.head), chest: visOf(save.equip.chest), boots: visOf(save.equip.boots), cloak: visOf(save.equip.cloak),
-    main: visOf(main, gemColor(main)), off: visOf(off, gemColor(off)), showHelmet: save.showHelmet, ghost: false, scale: 1,
+    head: styled(save, 'head', save.equip.head), chest: styled(save, 'chest', save.equip.chest), boots: styled(save, 'boots', save.equip.boots), cloak: styled(save, 'cloak', save.equip.cloak),
+    main: styled(save, 'mainA', main, gemColor(main)), off: visOf(off, gemColor(off)), showHelmet: save.showHelmet, ghost: false, scale: 1,
     aura: main && main.rarity >= 3 ? RARITY_COLORS[main.rarity] : null, mannequin: false,
   };
 }
@@ -168,10 +241,20 @@ function drawLegs(ctx: CanvasRenderingContext2D, L: Look, dir: Dir, ph: number, 
     const hx = side ? sgn * 1.2 : sgn * 3.2;
     ctx.strokeStyle = pants;
     ctx.lineWidth = 4.6;
+    ctx.lineJoin = 'round';
+    // two-segment leg: the knee flexes forward with the stride
+    const bend = side ? (1.2 + Math.abs(Math.sin(ph)) * 2.4 * amp) : 0.6 * sgn;
+    const kx = (hx + fx) / 2 + (side ? bend : bend);
+    const ky = (-14 + by + fy - 4) / 2 - (side ? 0.4 : 0);
     ctx.beginPath();
     ctx.moveTo(hx, -14 + by);
+    ctx.lineTo(kx, ky);
     ctx.lineTo(fx, fy - 4);
     ctx.stroke();
+    ctx.fillStyle = shade(pants, -0.18);
+    ctx.beginPath();
+    ctx.arc(kx, ky, 1.5, 0, TAU);
+    ctx.fill();
     ctx.strokeStyle = bootC;
     ctx.lineWidth = 5.2;
     ctx.beginPath();
@@ -354,6 +437,27 @@ function drawTorso(ctx: CanvasRenderingContext2D, L: Look, dir: Dir, by: number,
     ctx.fillStyle = trim;
     ctx.fillRect(-1.3, -15.8 + by, 2.6, 2.6);
   }
+
+  // v3: specular sheen sweep across metal armor
+  const ch = L.chest;
+  if (ch && !L.mannequin && (ch.style === 0 || ch.style === 2 || ch.style === 4)) {
+    const cyc = (t * 0.32 + ch.tier * 0.17) % 2.4;
+    if (cyc < 1) {
+      ctx.save();
+      torsoPath(ctx, dir === 2 || dir === 3, by);
+      ctx.clip();
+      const sx = -14 + cyc * 28;
+      ctx.fillStyle = rgba('#ffffff', 0.26 + ch.tier * 0.02);
+      ctx.beginPath();
+      ctx.moveTo(sx, -31 + by);
+      ctx.lineTo(sx + 4, -31 + by);
+      ctx.lineTo(sx - 4, -12 + by);
+      ctx.lineTo(sx - 8, -12 + by);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
 }
 
 function drawPauldrons(ctx: CanvasRenderingContext2D, L: Look, dir: Dir, by: number): void {
@@ -381,10 +485,18 @@ function drawArm(ctx: CanvasRenderingContext2D, L: Look, sx: number, sy: number,
   const c = L.chest;
   const sleeve = c ? (c.style === 2 || c.style === 4 ? shade(c.main, -0.1) : c.main) : L.mannequin ? '#b5895a' : '#5a6478';
   ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   ctx.strokeStyle = sleeve;
   ctx.lineWidth = c && c.style === 3 ? 5.4 : 4.2;
+  // elbow: bends outward from the body, more when the hand is pulled in close
+  const reachLen = Math.hypot(hx - sx, hy - sy);
+  const flex = Math.max(0, 12 - reachLen) * 0.35 + 1.2;
+  const out = sx === 0 ? 1 : Math.sign(sx);
+  const ex = (sx + hx) / 2 + out * flex;
+  const ey = (sy + hy) / 2 + 1.2;
   ctx.beginPath();
   ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
   ctx.lineTo(hx, hy);
   ctx.stroke();
   ctx.fillStyle = L.skin;
@@ -527,7 +639,19 @@ function drawHead(ctx: CanvasRenderingContext2D, L: Look, dir: Dir, hy: number, 
   ctx.beginPath();
   ctx.arc(0, hy + 2, 8, 0.2, Math.PI - 0.2);
   ctx.fill();
-  if (!back && !L.mannequin) {
+  const blinkPh = ((L.hair.charCodeAt(2) || 7) + (L.eyes.charCodeAt(3) || 3)) * 0.173;
+  const blinking = ((t + blinkPh) % 3.9) < 0.13;
+  if (!back && !L.mannequin && blinking) {
+    ctx.strokeStyle = '#1b1b24';
+    ctx.lineWidth = 1.1;
+    for (const ex of side ? [3.6] : [-3.3, 3.3]) {
+      ctx.beginPath();
+      ctx.moveTo(ex - 1.7, hy + 1);
+      ctx.quadraticCurveTo(ex, hy + 2.1, ex + 1.7, hy + 1);
+      ctx.stroke();
+    }
+  }
+  if (!back && !L.mannequin && !blinking) {
     const eyes = side ? [3.6] : [-3.3, 3.3];
     for (const ex of eyes) {
       ctx.fillStyle = '#1b1b24';
@@ -635,8 +759,8 @@ function drawCape(ctx: CanvasRenderingContext2D, L: Look, dir: Dir, vx: number, 
   const c = L.cloak;
   if (!c) return;
   const sp = Math.hypot(vx, vy);
-  const m = Math.min(1, sp / 150);
-  const sway = Math.sin(t * 2.6) * 1.4 + Math.sin(t * 7.3) * m * 1.2;
+  const m = Math.min(1, sp / 150 + Math.abs(capeTip.x) * 0.06);
+  const sway = Math.sin(t * 2.6) * 1.4 + Math.sin(t * 7.3) * m * 1.2 + capeTip.y * 0.4;
   const side = dir === 2 || dir === 3;
   ctx.fillStyle = c.main;
   ctx.strokeStyle = c.trim;
@@ -650,8 +774,8 @@ function drawCape(ctx: CanvasRenderingContext2D, L: Look, dir: Dir, vx: number, 
     ctx.lineTo(-9 - tr, -6 + sway);
     ctx.quadraticCurveTo(-8 - tr * 0.5, -18, -3, -29 + by);
   } else {
-    const dx = (-vx / 150) * 4;
-    const lift = dir === 1 ? -m * 3 : 0;
+    const dx = capeTip.x;
+    const lift = dir === 1 ? capeTip.y : 0;
     ctx.moveTo(-8, -29 + by);
     ctx.lineTo(8, -29 + by);
     ctx.lineTo(11 + dx + sway * 0.4, -4 + lift);
@@ -856,6 +980,17 @@ export function drawHumanoid(ctx: CanvasRenderingContext2D, x: number, y: number
   };
   const quiver = !!main && main.kind === 'bow';
 
+  // ---- v3: spring cape and blade-trail samples (world space)
+  capeTip = updateCape(A, o.vx, o.vy, o.t);
+  if (main && melee) {
+    const len = main.kind === 'spear' || main.kind === 'halberd' ? 46 : main.kind === 'twinblade' ? 26 : 30;
+    const mir = dir === 2 ? -1 : 1;
+    const swingNow = (A.kind === 'attack' && A.swing < 1) || (A.kind === 'skill' && A.t > 0.1);
+    recordTrail(A,
+      x + mir * (mhx + Math.cos(wAng) * 7) * s, y - z + (mhy + Math.sin(wAng) * 7) * s,
+      x + mir * (mhx + Math.cos(wAng) * len) * s, y - z + (mhy + Math.sin(wAng) * len) * s,
+      o.t, swingNow && !L.mannequin && alpha > 0.5);
+  }
   // ---- back layers
   if (dir !== 1) drawCape(ctx, L, dir, o.vx, o.vy, o.t, by);
   if (dir === 1) {
@@ -868,6 +1003,24 @@ export function drawHumanoid(ctx: CanvasRenderingContext2D, x: number, y: number
     ctx.fillStyle = '#6b4a2f';
     ctx.fillRect(-1.5, -14, 3, 14);
     ctx.fillRect(-7, -2, 14, 3);
+  } else if (o.seated) {
+    // straddling a saddle: thighs forward, boots hanging along the flanks
+    const bootC = L.boots ? L.boots.main : '#4a3424';
+    const pants = L.chest ? shade(L.chest.accent, -0.15) : '#3a3a4a';
+    ctx.lineCap = 'round';
+    for (const sg of side ? [1] : [-1, 1]) {
+      ctx.strokeStyle = pants;
+      ctx.lineWidth = 4.6;
+      ctx.beginPath();
+      ctx.moveTo(sg * (side ? 1 : 3), -14 + by);
+      ctx.lineTo(sg * (side ? 5 : 7), -8 + by);
+      ctx.lineTo(sg * (side ? 4 : 7.5), -2 + by);
+      ctx.stroke();
+      ctx.fillStyle = bootC;
+      ctx.beginPath();
+      ctx.ellipse(sg * (side ? 5 : 7.5), -1 + by, 2.8, 2, 0, 0, TAU);
+      ctx.fill();
+    }
   } else drawLegs(ctx, L, dir, ph, amp, by);
   // back arm (side views)
   if (side) drawArm(ctx, L, -1, sY + 1, -1 + Math.sin(ph + Math.PI) * 4 * amp, sY + 11);

@@ -9,7 +9,15 @@ import { G } from '../core/state';
 import { RARITY_COLORS, TILE, VIEW_H, WALL_H } from '../data/constants';
 import { REALMS } from '../data/realms';
 import { itemDef } from '../data/items';
-import { GT, SOL, type GameMap } from '../world/tilemap';
+import { ELEV, ELEV_H, GT, SOL, type GameMap } from '../world/tilemap';
+import { drawBladeTrail, drawBreakable, drawCaravan, drawCastShadows, drawCloudShadows, drawEventGate, drawForeground, drawGrass, drawGroundFeatures, drawMount, drawPet, drawPrints, footsteps } from './v3render';
+import { groundTile } from './tilecache';
+import { GAUGE_COLORS } from '../data/v3';
+import type { Companion } from '../entities/companion';
+import type { Adventurer, Caravan, Shadow } from '../entities/allies';
+import type { Breakable } from '../entities/breakable';
+import type { Pet } from '../entities/pet';
+import type { GaugeKind } from '../types/game';
 import { minimapColor, setTileScale, wallFace, wallTop } from './tilecache';
 import { bakedWall, drawGround } from './chunks';
 import { propSprite, setPropScale } from './props';
@@ -21,7 +29,8 @@ import { fx } from './fx';
 import { weather } from './weather';
 import { Monster } from '../entities/monster';
 import { Npc } from '../entities/npc';
-import { clamp, hash2, lerp, mix, rgba, TAU } from '../engine/util';
+import { clamp, hash2, lerp, mix, rgba, shade, TAU } from '../engine/util';
+import { titlebarOffset } from '../platform/desktop';
 
 interface DL {
   k: number;
@@ -39,12 +48,21 @@ export class Renderer {
   h = 1;
   dpr = 1;
   scale = 1;
+  /** supersampling multiplier on top of devicePixelRatio (Settings > Render quality) */
+  quality = 1;
+  /** dynamic-resolution factor (drops when the frame rate sags, recovers when it is stable) */
+  dynScale = 1;
+  private perfAcc = 0;
+  private perfFrames = 0;
+  private perfGood = 0;
   cam = { x: 0, y: 0, zoom: 1, pulse: 0, pulseZ: 1, sx: 0, sy: 0 };
   private light: HTMLCanvasElement;
   private lctx: CanvasRenderingContext2D;
   private dl: DL[] = [];
   private dlN = 0;
   private minimapFor: GameMap | null = null;
+  /** elevation lift (px) of a world point on the current map */
+  private lift: (x: number, y: number) => number = () => 0;
 
   constructor(readonly canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d', { alpha: false }) as CanvasRenderingContext2D;
@@ -55,9 +73,15 @@ export class Renderer {
   }
 
   resize(): void {
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    const top = titlebarOffset();
     const cw = window.innerWidth;
-    const ch = window.innerHeight;
+    const ch = Math.max(200, window.innerHeight - top);
+    // high-DPI supersampling inside a pixel budget (2.4 MP at Native quality), then dynamic resolution
+    const q = this.quality || 1;
+    const base = Math.min(2.5, (window.devicePixelRatio || 1) * q);
+    const budget = 2.4e6 * q * q;
+    const cap = Math.sqrt(budget / Math.max(1, cw * ch));
+    this.dpr = Math.max(0.6, Math.min(base, cap) * this.dynScale);
     this.canvas.style.width = cw + 'px';
     this.canvas.style.height = ch + 'px';
     this.w = this.canvas.width = Math.round(cw * this.dpr);
@@ -99,7 +123,30 @@ export class Renderer {
     this.cam.y = m.ph <= vh ? m.ph / 2 : clamp(this.cam.y, vh / 2, m.ph - vh / 2);
   }
 
+  /** dynamic resolution: keep 60 FPS by trading render resolution, with hysteresis */
+  private adaptResolution(dt: number): void {
+    this.perfAcc += dt;
+    this.perfFrames++;
+    if (this.perfAcc < 1.25) return;
+    const fps = this.perfFrames / this.perfAcc;
+    this.perfAcc = 0;
+    this.perfFrames = 0;
+    if (fps < 53 && this.dynScale > 0.55) {
+      this.dynScale = Math.max(0.55, this.dynScale - 0.15);
+      this.perfGood = 0;
+      this.resize();
+    } else if (fps > 58.5 && this.dynScale < 1) {
+      this.perfGood += 1.25;
+      if (this.perfGood >= 6) {
+        this.perfGood = 0;
+        this.dynScale = Math.min(1, this.dynScale + 0.1);
+        this.resize();
+      }
+    } else this.perfGood = 0;
+  }
+
   update(dt: number): void {
+    this.adaptResolution(dt);
     const p = G.player;
     const mw = G.game.mouseWorld();
     const lookX = p.x + (mw.x - p.x) * 0.12;
@@ -112,6 +159,8 @@ export class Renderer {
       this.cam.pulseZ = lerp(this.cam.pulseZ, this.cam.pulse > 0.25 ? 1.14 : 1, 1 - Math.exp(-dt * 12));
     } else this.cam.pulseZ = lerp(this.cam.pulseZ, 1, 1 - Math.exp(-dt * 8));
     this.clampCam();
+    const w = G.world;
+    if (!G.game.paused) footsteps([p, ...w.party, ...w.vanguard, ...w.adventurers, ...w.monsters.filter((m) => !m.def.flying && Math.abs(m.x - p.x) < 500)], w.map, dt);
     const sh = fx.shakeAmt;
     this.cam.sx = sh > 0 ? (Math.random() - 0.5) * sh * 2 : 0;
     this.cam.sy = sh > 0 ? (Math.random() - 0.5) * sh * 2 : 0;
@@ -155,8 +204,12 @@ export class Renderer {
     const frame = Math.floor(t * 4) % 4;
     // ---- ground (baked chunks + animated liquids)
     drawGround(ctx, m, x0, y0, x1, y1, frame, s);
-    // ---- ground decals
+    const lift = m.hasElev ? (x: number, y: number) => m.liftAt(x, y) * ELEV_H : () => 0;
+    this.lift = lift;
+    // ---- ground decals, footprints, pads / fishing / dig sites
     this.drawDecals(ctx, t);
+    drawPrints(ctx);
+    drawGroundFeatures(ctx, m, t, lift);
     // ---- sorted pass (only walls that can overlap actors take part)
     this.dlN = 0;
     for (let ty = y0; ty <= y1; ty++) {
@@ -173,10 +226,26 @@ export class Renderer {
     for (const p of m.props) if (!p.hidden && inView(p.x, p.y)) this.push(p.y + p.sortOff, 1, p);
     for (const n of m.nodes) if (inView(n.x, n.y)) this.push(n.y, 2, n);
     const p = G.player;
-    const actors: Actor[] = [p, ...(world.companion && !world.companion.dead ? [world.companion] : []), ...world.monsters, ...world.npcs];
+    const actors: Actor[] = [
+      p, ...world.party.filter((c) => !c.dead), ...world.vanguard.filter((v) => !v.dead), ...world.adventurers, ...world.shadows,
+      ...world.breakables, ...(world.caravan ? [world.caravan] : []), ...world.monsters, ...world.npcs,
+    ];
+    // v3: long sun / moon shadows and swaying grass sit on the ground under every sprite
+    drawCastShadows(ctx, actors, m.props, lift, inView);
+    drawGrass(ctx, m, x0, y0, x1, Math.min(m.h - 1, y1 - 3), t, [p, ...world.party, ...world.adventurers, ...world.monsters], lift);
     for (const a of actors) if (inView(a.x, a.y) && !a.removed) this.push(a.y + 0.5, 3, a);
     for (const pr of world.projectiles) if (inView(pr.x, pr.y)) this.push(pr.y + 1, 4, pr);
     for (const l of world.loots) if (inView(l.x, l.y)) this.push(l.y, 5, l);
+    if (world.pet && inView(world.pet.x, world.pet.y)) this.push(world.pet.y + 2, 7, world.pet);
+    if (m.hasElev) {
+      // plateau rims that overlap lower ground to the north are re-drawn in sorted order
+      for (let ty = Math.max(1, y0); ty <= y1; ty++) {
+        for (let tx = x0; tx <= x1; tx++) {
+          const i = ty * m.w + tx;
+          if (m.elev[i] === ELEV.PLATEAU && m.elev[i - m.w] === ELEV.GROUND) this.push(ty * TILE + 0.25, 6, null, tx, ty);
+        }
+      }
+    }
     const list = this.dl;
     const n = this.dlN;
     const sorted = list.slice(0, n).sort((a, b) => a.k - b.k);
@@ -185,23 +254,55 @@ export class Renderer {
         case 0:
           this.drawWall(ctx, m, e.a, e.b);
           break;
-        case 1:
-          this.drawProp(ctx, e.o as Prop, t);
+        case 1: {
+          const pr = e.o as Prop;
+          const L = lift(pr.x, pr.y);
+          if (L) ctx.translate(0, -L);
+          this.drawProp(ctx, pr, t);
+          if (L) ctx.translate(0, L);
           break;
-        case 2:
-          this.drawNode(ctx, e.o as ResourceNode, t);
+        }
+        case 2: {
+          const n = e.o as ResourceNode;
+          const L = lift(n.x, n.y);
+          if (L) ctx.translate(0, -L);
+          this.drawNode(ctx, n, t);
+          if (L) ctx.translate(0, L);
           break;
-        case 3:
-          this.drawActor(ctx, e.o as Actor, t);
+        }
+        case 3: {
+          const a = e.o as Actor;
+          const L = lift(a.x, a.y);
+          if (L) ctx.translate(0, -L);
+          this.drawActor(ctx, a, t);
+          if (L) ctx.translate(0, L);
           break;
+        }
         case 4:
           this.drawProjectile(ctx, e.o as Projectile, t);
           break;
-        case 5:
-          this.drawLoot(ctx, e.o as LootInst, t);
+        case 5: {
+          const l = e.o as LootInst;
+          const L = lift(l.x, l.y);
+          if (L) ctx.translate(0, -L);
+          this.drawLoot(ctx, l, t);
+          if (L) ctx.translate(0, L);
           break;
+        }
+        case 6:
+          ctx.drawImage(groundTile(m.realm, m.ground[e.b * m.w + e.a], Math.floor(hash2(e.a, e.b, 7) * 4), 0), e.a * TILE, e.b * TILE - ELEV_H, TILE, TILE);
+          break;
+        case 7: {
+          const pet = e.o as Pet;
+          const L = lift(pet.x, pet.y);
+          if (L) ctx.translate(0, -L);
+          drawPet(ctx, pet, t);
+          if (L) ctx.translate(0, L);
+          break;
+        }
       }
     }
+    drawCloudShadows(ctx, m, t, this.cam.x, this.cam.y, vw, vh);
     // ---- day/night lighting (multiply), then emissive overlays so skills glow in the dark
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.drawLighting(ctx, t, x0, x1, y0, y1);
@@ -212,8 +313,9 @@ export class Renderer {
     this.drawRains(ctx);
     this.drawLabels(ctx, actors);
     fx.drawNumbers(ctx);
-    // ---- screen space weather
+    // ---- screen space: foreground canopy (1.18x parallax), god-rays, weather
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    drawForeground(ctx, this.w, this.h, s, this.cam.x, this.cam.y, t);
     weather.draw(ctx, this, t);
   }
 
@@ -351,6 +453,25 @@ export class Renderer {
   }
 
   private drawActor(ctx: CanvasRenderingContext2D, a: Actor, t: number): void {
+    if (a.kind === 'prop') {
+      drawBreakable(ctx, a as Breakable, t);
+      return;
+    }
+    if (a.kind === 'caravan') {
+      drawCaravan(ctx, a as Caravan, t);
+      return;
+    }
+    if (a.kind === 'shadow') {
+      const sh = a as Shadow;
+      const k = sh.run.done ? Math.max(0, 1 - sh.fade / 0.35) : 1;
+      drawHumanoid(ctx, sh.x, sh.y, { ...sh.look, ghost: true, aura: '#7fe9ff' }, sh.anim, sh.dir, { aim: sh.aim, moving: false, vx: 0, vy: 0, t, z: sh.z, alpha: 0.6 * k, shadow: false });
+      drawBladeTrail(ctx, sh.anim, '#7fe9ff', 0);
+      return;
+    }
+    if (a instanceof Monster && a.def.id === 'ev_gate') {
+      drawEventGate(ctx, a.x, a.y, t, a.hp / a.stats.maxHp);
+      return;
+    }
     if (a instanceof Monster) {
       drawMonster(ctx, a, t);
       if (!a.dead && !a.isBoss && (a.hpBarT > 0 || a.isElite) && a.spawnT <= 0) this.drawHpBar(ctx, a);
@@ -369,7 +490,12 @@ export class Renderer {
         ctx.drawImage(glowSprite('#7fe9ff'), p.x - 24, p.y - 56, 48, 60);
         ctx.globalCompositeOperation = 'source-over';
       }
-      drawHumanoid(ctx, p.x, p.y, p.look, p.anim, p.dir, { aim: p.aim, moving: p.moving, vx: p.vx, vy: p.vy, t, blocking: p.blocking, flash: p.flash, z: p.z, barrier: p.barrier, alpha: blink * (p.dead ? 1 - p.deathT * 1.6 : 1) });
+      const M = p.mounted;
+      const seatH = M ? (M.kind === 'drake' || M.kind === 'gryphon' ? 20 : 16) : 0;
+      if (M) drawMount(ctx, p.x, p.y, M, p.dir, p.anim.walk, false);
+      drawHumanoid(ctx, p.x, p.y - seatH, p.look, p.anim, p.dir, { aim: p.aim, moving: p.moving && !M, vx: p.vx, vy: p.vy, t, blocking: p.blocking, flash: p.flash, z: p.z, barrier: p.barrier, alpha: blink * (p.dead ? 1 - p.deathT * 1.6 : 1), seated: !!M, shadow: !M });
+      if (M) drawMount(ctx, p.x, p.y, M, p.dir, p.anim.walk, true);
+      drawBladeTrail(ctx, p.anim, p.weaponColor, 0);
       if (p.parryFlash > 0) {
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = p.parryFlash * 3;
@@ -380,10 +506,11 @@ export class Renderer {
       return;
     }
     if (a.kind === 'companion') {
-      const c = G.world.companion;
-      if (!c) return;
+      const c = a as Companion;
       drawHumanoid(ctx, c.x, c.y, c.look, c.anim, c.dir, { aim: c.aim, moving: c.moving, vx: c.vx, vy: c.vy, t, blocking: c.guard, flash: c.flash, z: c.z, barrier: c.barrier, alpha: c.iframes > 0.9 && c.st !== 'chain' ? 0.7 : 1 });
-      ctx.strokeStyle = rgba(c.def.colors.glow, 0.6);
+      drawBladeTrail(ctx, c.anim, c.def.colors.glow, 0);
+      const ring = c.role === 'adventurer' ? ((c as Adventurer).dueling ? '#ff5d6c' : '#5ee6a0') : c.role === 'vanguard' ? '#ffd27a' : c.def.colors.glow;
+      ctx.strokeStyle = rgba(ring, 0.6);
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.ellipse(c.x, c.y + 1, 13, 5, 0, 0, TAU);
@@ -413,23 +540,72 @@ export class Renderer {
     const p = G.player;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
+    const title = G.save.title;
+    if (title && !p.dead) {
+      const ty = p.y - 62 - this.lift(p.x, p.y) - (p.mounted ? 16 : 0) - p.z;
+      ctx.font = '700 8px "Trebuchet MS", "Segoe UI", sans-serif';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(5,8,18,0.85)';
+      ctx.strokeText(`< ${title} >`, p.x, ty);
+      ctx.fillStyle = '#ffd166';
+      ctx.fillText(`< ${title} >`, p.x, ty);
+    }
     for (const a of actors) {
       if (a.dead || a === p) continue;
+      const lifted = this.lift(a.x, a.y);
+      if (a instanceof Monster && Object.keys(a.gauges).length && a.spawnT <= 0) {
+        const gs = Object.keys(a.gauges) as GaugeKind[];
+        const gy = a.y - a.height() - (a.def.flying ? 16 : 0) - 18 - lifted;
+        gs.forEach((g, i) => {
+          const gx = a.x + (i - (gs.length - 1) / 2) * 9;
+          ctx.fillStyle = GAUGE_COLORS[g];
+          ctx.beginPath();
+          ctx.moveTo(gx, gy - 4);
+          ctx.lineTo(gx + 3.5, gy);
+          ctx.lineTo(gx, gy + 4);
+          ctx.lineTo(gx - 3.5, gy);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(5,8,18,0.8)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        });
+      }
       let label = '';
       let color = '#e6edf7';
-      let y = a.y - 54;
+      let y = a.y - 54 - lifted;
       if (a instanceof Npc) {
         if (Math.hypot(a.x - p.x, a.y - p.y) > 150) continue;
         label = a.displayName;
         color = a.spawn.role === 'companion' ? '#7fe9ff' : '#ffe9b0';
       } else if (a instanceof Monster) {
-        if (!a.isElite || a.spawnT > 0) continue;
+        if ((!a.isElite && !a.raid && a.def.id !== 'ev_gate') || a.spawnT > 0) continue;
         label = `${a.def.name}  Lv.${a.level}`;
-        color = '#ff9a3d';
-        y = a.y - a.height() - (a.def.flying ? 16 : 0) - 14;
+        color = a.raid ? '#ff5d6c' : a.def.id === 'ev_gate' ? '#c9a8ff' : '#ff9a3d';
+        y = a.y - a.height() - (a.def.flying ? 16 : 0) - 14 - lifted;
       } else if (a.kind === 'companion') {
+        const c = a as Companion;
         label = a.displayName;
-        color = '#7fe9ff';
+        color = c.role === 'adventurer' ? '#5ee6a0' : c.role === 'vanguard' ? '#ffd27a' : '#7fe9ff';
+        if (c.role === 'adventurer') {
+          const adv = c as Adventurer;
+          if (Math.hypot(a.x - p.x, a.y - p.y) > 260 && !adv.helpNeeded) continue;
+          if (adv.bubbleT > 0) {
+            ctx.font = '600 9px "Trebuchet MS", "Segoe UI", sans-serif';
+            const bw = ctx.measureText(adv.bubble).width + 10;
+            ctx.fillStyle = 'rgba(245,248,255,0.92)';
+            ctx.beginPath();
+            ctx.roundRect(a.x - bw / 2, y - 30, bw, 14, 5);
+            ctx.fill();
+            ctx.fillStyle = '#1a2340';
+            ctx.fillText(adv.bubble, a.x, y - 18);
+          }
+          if (adv.helpNeeded) {
+            ctx.font = '900 16px "Trebuchet MS", "Segoe UI", sans-serif';
+            ctx.fillStyle = Math.floor(G.realTime * 4) % 2 ? '#ff9a3d' : '#ffd166';
+            ctx.fillText('!', a.x, y - 32);
+          }
+        }
       }
       if (!label) continue;
       ctx.font = '700 9px "Trebuchet MS", "Segoe UI", sans-serif';
@@ -819,8 +995,11 @@ export class Renderer {
     const p = G.player;
     light(p.x, p.y - 20, m.kind === 'dungeon' || m.kind === 'abyss' ? 150 : 95, '#ffe9c8', 0.75);
     if (p.look?.main && (p.look.main.temper >= 6 || p.look.main.gem)) light(p.x, p.y - 20, 60, p.look.main.gem ?? p.look.main.glow, 0.6);
-    const c = G.world.companion;
-    if (c && !c.dead) light(c.x, c.y - 20, 70, '#ffe9c8', 0.45);
+    for (const c of G.world.party) if (!c.dead) light(c.x, c.y - 20, 70, '#ffe9c8', 0.45);
+    for (const v of G.world.vanguard) if (!v.dead) light(v.x, v.y - 20, 60, '#ffd27a', 0.4);
+    if (G.world.pet) light(G.world.pet.x, G.world.pet.y - G.world.pet.z, 55, G.world.pet.def.color, 0.6);
+    for (const pd of m.pads) light(pd.x, pd.y, 40, '#7fe9ff', 0.4);
+    for (const b of G.world.breakables) if (b.variant === 'barrel' || b.variant === 'frost') light(b.x, b.y - 10, 36, b.variant === 'barrel' ? '#ff7a3d' : '#7fe9ff', 0.4);
     for (const pr of G.world.projectiles) if (pr.spec.kind !== 'arrow' && pr.spec.kind !== 'rock') light(pr.x, pr.y - pr.z, 46, pr.color, 0.8);
     for (const z of G.world.zones) light(z.spec.x, z.spec.y, z.spec.r, z.spec.color, 0.45);
     for (const l of G.world.loots) if (!(l.kind === 'chest' && l.opened)) light(l.x, l.y - 20, 45, RARITY_COLORS[l.rarity] ?? '#ffffff', 0.7);
@@ -855,7 +1034,11 @@ export class Renderer {
     const g = c.getContext('2d') as CanvasRenderingContext2D;
     const img = g.createImageData(m.w, m.h);
     for (let i = 0; i < m.w * m.h; i++) {
-      const col = minimapColor(m.realm, m.ground[i], m.solid[i], m.wallStyle);
+      let col = minimapColor(m.realm, m.ground[i], m.solid[i], m.wallStyle);
+      if (m.hasElev && m.elev[i] === ELEV.PLATEAU) col = shade(col, 0.18);
+      else if (m.hasElev && m.elev[i] === ELEV.STAIRS) col = '#c9b48a';
+      else if (m.ground[i] === GT.BRIDGE) col = '#8a5a32';
+      else if (m.ground[i] === GT.SHALLOW) col = '#6fb8e8';
       const n = parseInt(col.slice(1), 16);
       img.data[i * 4] = (n >> 16) & 255;
       img.data[i * 4 + 1] = (n >> 8) & 255;

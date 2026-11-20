@@ -24,6 +24,11 @@ import { addItem, addGear } from './systems/inventory';
 import { gainXp } from './systems/progression';
 import { makeGear } from './data/items';
 import { angTo, lerp } from './engine/util';
+import { desktop, installTitlebar, migrateBrowserSaves } from './platform/desktop';
+import { runSelftest } from './platform/selftest';
+import { GAMBITS, GAMBIT_ORDER } from './data/v3';
+import { checkAchievements } from './systems/achievements';
+import { style } from './systems/feel';
 
 type GState = 'title' | 'boot' | 'play';
 
@@ -45,6 +50,8 @@ export class Game {
   private autosaveT = 0;
   private lastMapId = '';
   private titleT = 0;
+  /** hard time-freeze (Perfect Parry, Finishing Nova): the world stops, rendering continues */
+  private freezeT = 0;
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
     G.game = this;
@@ -52,7 +59,9 @@ export class Game {
     this.renderer = new Renderer(canvas);
     G.ui = new UI(uiRoot);
     G.world = new World();
+    migrateBrowserSaves();
     G.settings = loadSettings();
+    installTitlebar(() => this.renderer.resize());
     const unlock = () => audio.init();
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
@@ -64,7 +73,9 @@ export class Game {
   start(): void {
     this.applySettings();
     this.titleScene();
-    G.ui.showTitle();
+    if (desktop?.selftest) runSelftest(() => this.startSelftest());
+    else G.ui.showTitle();
+    if (desktop && G.settings.fullscreen && !desktop.isFullscreen()) desktop.setFullscreen(true);
     requestAnimationFrame((t) => {
       this.last = t;
       requestAnimationFrame(this.frame);
@@ -95,6 +106,24 @@ export class Game {
   applySettings(): void {
     const s = G.settings;
     audio.setVolumes(s.master, s.music, s.sfx);
+    this.renderer.quality = s.quality;
+    this.renderer.resize();
+  }
+
+  freeze(dur: number): void {
+    this.freezeT = Math.max(this.freezeT, dur);
+  }
+
+  /** throwaway character for the desktop self-test: never written to a save slot */
+  startSelftest(): void {
+    G.save = newSave(-1, 'Selftest', { skin: 2, hairStyle: 1, hairColor: 2, eyeColor: 1 }, 'open', 'sword_shield');
+    G.save.learned.push('sw_quadrant', 'sh_bash');
+    G.save.hotbar = ['sw_gale_lunge', 'sw_quadrant', 'sh_bash', null, null, null];
+    G.save.skillRanks = { sw_gale_lunge: 1, sw_quadrant: 1, sh_bash: 1 };
+    this.enterWorld('wild:0', 'north');
+    this.boot = null;
+    this.state = 'play';
+    G.ui.setScreen(null);
   }
 
   // ---------------------------------------------------------------- flows
@@ -104,7 +133,8 @@ export class Game {
     G.save.time = 18.6;
     G.player = new Player();
     G.player.refresh();
-    G.world.companion = null;
+    G.world.party = [];
+    G.world.pet = null;
     G.world.load('city:0', 'gate');
     G.world.transition = null;
     fx.banners.length = 0;
@@ -117,15 +147,18 @@ export class Game {
     G.player.refresh();
     G.player.hp = Math.min(G.save.hp, G.player.stats.maxHp);
     G.player.mp = Math.min(G.save.mp, G.player.stats.maxMp);
-    G.world.companion = null;
+    G.world.party = [];
+    G.world.pet = null;
+    style.reset();
     G.world.load(mapId, entry);
     G.world.transition = null;
     if (px && py && G.world.map.boxFree(px, py, G.player.hw, G.player.hh)) {
       G.player.x = px;
       G.player.y = py;
     }
-    if (G.save.activeCompanion && G.save.companions[G.save.activeCompanion]?.recruited) G.world.setCompanion(G.save.activeCompanion);
+    G.world.setParty();
     refreshBoard();
+    checkAchievements(true);
     this.snapCamera();
     this.lastMapId = G.world.map.id;
     this.decorating = false;
@@ -258,12 +291,25 @@ export class Game {
         break;
       }
       case 'companion': G.ui.openGuild(); break;
+      case 'adventurer': {
+        const adv = w.adventurerById(a.id);
+        if (adv) G.ui.openAdventurer(adv);
+        break;
+      }
+      case 'fish': G.ui.openFishing(a.spot); break;
+      case 'dig': w.dig(a.id); break;
+      case 'stable': G.ui.openStable(); break;
+      case 'blackmarket': G.ui.openBlackMarket(); break;
     }
   }
 
   // ---------------------------------------------------------------- loop
 
+  /** milliseconds of main-thread work in the last frame (simulation + draw recording) */
+  workMs = 0;
+
   private frame = (now: number): void => {
+    const workStart = performance.now();
     const realDt = Math.min(0.1, Math.max(0.001, (now - this.last) / 1000));
     this.last = now;
     this.frameDt = realDt;
@@ -284,7 +330,11 @@ export class Game {
     } else if (this.state === 'play') {
       if (this.slowT > 0) this.slowT -= realDt;
       G.timeScale = this.slowT > 0 ? this.slowScale : 1;
-      if (this.uiBlocking()) {
+      if (this.freezeT > 0 && !this.uiBlocking()) {
+        this.freezeT -= realDt;
+        this.acc = 0;
+        this.renderer.update(realDt * 0.2);
+      } else if (this.uiBlocking()) {
         G.input.endFrame();
         this.acc = 0;
       } else {
@@ -325,6 +375,7 @@ export class Game {
     this.camDelta.x = this.renderer.cam.x - camBefore.x;
     this.camDelta.y = this.renderer.cam.y - camBefore.y;
     this.render(now / 1000);
+    this.workMs = performance.now() - workStart;
     requestAnimationFrame(this.frame);
   };
 
@@ -397,8 +448,36 @@ export class Game {
     }
     if (inp.pressed('KeyK')) {
       inp.consume('KeyK');
-      toggle('character', () => ui.openCharacter('mastery'));
+      toggle('constellation', () => ui.openConstellation());
     }
+    if (inp.pressed('KeyO')) {
+      inp.consume('KeyO');
+      toggle('bestiary', () => ui.openBestiary());
+    }
+    if (inp.pressed('KeyN')) {
+      inp.consume('KeyN');
+      toggle('journal', () => ui.openJournal());
+    }
+    if (inp.pressed('KeyP')) {
+      inp.consume('KeyP');
+      toggle('stable', () => ui.openStable());
+    }
+    if (inp.pressed('KeyT')) {
+      inp.consume('KeyT');
+      toggle('wardrobe', () => ui.openWardrobe());
+    }
+    if (inp.pressed('KeyU')) {
+      inp.consume('KeyU');
+      toggle('codex', () => ui.openCodex(false));
+    }
+    GAMBIT_ORDER.forEach((g, i) => {
+      const code = `F${i + 1}`;
+      if (!inp.pressed(code)) return;
+      inp.consume(code);
+      G.save.gambit = g;
+      G.ui.toast(`Gambit: ${GAMBITS[g].name} - ${GAMBITS[g].desc}`, 'info');
+      audio.play('ui');
+    });
     if (inp.pressed('KeyM')) {
       inp.consume('KeyM');
       toggle('character', () => ui.openCharacter('atlas'));

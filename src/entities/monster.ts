@@ -60,6 +60,9 @@ export class Monster extends Actor {
   look: Look | null;
   bob = Math.random() * TAU;
   bountyTag = '';
+  /** v3: roaming raid boss / world-event spawn */
+  raid = false;
+  eventTag = '';
 
   constructor(def: MonsterDef, level: number, x: number, y: number, mods: string[] = []) {
     super();

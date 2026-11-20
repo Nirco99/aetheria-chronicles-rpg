@@ -22,6 +22,7 @@ import { effectiveSockets } from '../systems/stats';
 import { gearIconURL, itemIconURL } from '../render/icons';
 import { audio } from '../engine/audio';
 import { RNG, pick } from '../engine/util';
+import { codexPane, enchantPane } from './v3ui';
 import { h, btn, gearCell, gearTooltip, itemCell, section, tip, hideTip } from './dom';
 
 const city = (): number => G.world.map.realm;
@@ -56,7 +57,7 @@ export function openForge(home: boolean): void {
   forgeTab = 'forge';
   selUid = null;
   G.ui.openPanel('forge', home ? 'Personal Master Anvil' : R.buildings.forge, (b) => {
-    const list: [string, string][] = [['forge', 'Forge'], ['smelt', 'Smelt'], ['temper', 'Temper'], ['socket', 'Gem Sockets'], ['salvage', 'Salvage']];
+    const list: [string, string][] = [['forge', 'Forge'], ['smelt', 'Smelt'], ['temper', 'Temper'], ['socket', 'Gem Sockets'], ['salvage', 'Salvage'], ['enchant', 'Arcane Enchanter'], ['codex', 'Relic Codex']];
     if (!home) list.push(['shop', 'Smith Shop']);
     b.append(tabs(forgeTab, list, (id) => { forgeTab = id; selUid = null; }));
     const body = h('div', { class: 'tab-body' });
@@ -66,6 +67,8 @@ export function openForge(home: boolean): void {
     else if (forgeTab === 'temper') temperPane(body);
     else if (forgeTab === 'socket') socketPane(body);
     else if (forgeTab === 'salvage') salvagePane(body);
+    else if (forgeTab === 'enchant') enchantPane(body);
+    else if (forgeTab === 'codex') codexPane(body, true);
     else shopBuy(body, 'smith');
   }, { wide: true, subtitle: home ? '+10% forging quality' : `${G.save.gold.toLocaleString()} G` });
 }
@@ -531,7 +534,7 @@ export function openGuild(): void {
         body.append(h('div', { class: 'comp-card' }, h('b', { text: `${c.name} - ${c.title}` }), h('p', { class: 'dim', text: c.bio }),
           h('small', { text: `Fights with: ${c.weapon}${c.off ? ' + ' + c.off : ''} • Chain Skill: ${c.chain} • Found in ${REALMS[c.city].city}` }),
           h('small', { text: `Requires: level ${c.req.level}${c.req.guild ? `, ${GUILDS[c.req.guild].short} ${GUILD_RANKS[c.req.rank ?? 0]}` : ''}${c.req.gold ? `, ${c.req.gold.toLocaleString()} G fee` : ''}` }),
-          rec ? btn(s.activeCompanion === c.id ? 'In your party' : 'Summon to party', () => { recruit(c.id); G.ui.refresh(); }, 'mini-btn', s.activeCompanion === c.id)
+          rec ? btn(s.party.includes(c.id) ? 'In your party' : 'Summon to party', () => { const e = recruit(c.id); if (e) G.ui.toast(e, 'warn'); G.ui.refresh(); }, 'mini-btn', s.party.includes(c.id))
             : btn('Recruit', () => { const e = recruit(c.id); if (e) G.ui.toast(e, 'warn'); G.ui.refresh(); }, 'mini-btn primary', !!block),
           !rec && block ? h('div', { class: 'warn small', text: block }) : null));
       }

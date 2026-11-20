@@ -15,7 +15,17 @@ import { REALMS } from '../data/realms';
 import { COMPANION_BY_ID } from '../data/guilds';
 import { SECONDS_PER_HOUR, TILE } from '../data/constants';
 import { itemDef, randomGear } from '../data/items';
-import { damage } from '../systems/combat';
+import { damage, tickDots } from '../systems/combat';
+import { Breakable } from '../entities/breakable';
+import { Adventurer, Caravan, Shadow, Vanguard, vanguardNames } from '../entities/allies';
+import { Pet } from '../entities/pet';
+import { style, wallSlam } from '../systems/feel';
+import { tickPowers, hasPower } from '../systems/powers';
+import { checkAchievements } from '../systems/achievements';
+import { checkRaidApproach, digTreasure, resetEvents, updateEvents, type WorldEvent } from '../systems/events';
+import { ADVENTURER_NAMES } from '../data/v3';
+import { salvageYield } from '../data/recipes';
+import { tierForLevel, RARITY_NAMES } from '../data/constants';
 import { addGear, addItem } from '../systems/inventory';
 import { checkAwakenings, deathPenalty } from '../systems/progression';
 import { onBossBounty, onKillBounty, refreshBoard } from '../systems/guilds';
@@ -86,7 +96,18 @@ export class World {
   private cache = new Map<string, GameMap>();
   monsters: Monster[] = [];
   npcs: Npc[] = [];
-  companion: Companion | null = null;
+  /** up to two guild companions fighting beside the Diver */
+  party: Companion[] = [];
+  vanguard: Vanguard[] = [];
+  adventurers: Adventurer[] = [];
+  shadows: Shadow[] = [];
+  breakables: Breakable[] = [];
+  caravan: Caravan | null = null;
+  pet: Pet | null = null;
+  event: WorldEvent | null = null;
+  duel: { adv: Adventurer; phase: 'count' | 'fight'; t: number; shown: number } | null = null;
+  raid: { boss: Monster; roaming: boolean } | null = null;
+  private achT = 0;
   projectiles: Projectile[] = [];
   teles: TeleInst[] = [];
   zones: ZoneInst[] = [];
@@ -107,6 +128,11 @@ export class World {
   timers: { t: number; fn: () => void }[] = [];
   private enemies: Actor[] = [];
   private allies: Actor[] = [];
+
+  /** first conscious party member (legacy single-companion call sites) */
+  get companion(): Companion | null {
+    return this.party.find((c) => !c.dead) ?? this.party[0] ?? null;
+  }
 
   // ---------------------------------------------------------------- maps
 
@@ -168,6 +194,14 @@ export class World {
     this.boss = null;
     this.rushQueue = [];
     this.eliteAlive = null;
+    this.vanguard = [];
+    this.adventurers = [];
+    this.shadows = [];
+    this.caravan = null;
+    this.event = null;
+    this.duel = null;
+    this.raid = null;
+    resetEvents();
     fx.clear();
     this.flow = new Int16Array(m.w * m.h);
     this.flowT = 0;
@@ -183,15 +217,23 @@ export class World {
       p.casting = null;
     }
     p.st = p.dead ? p.st : 'normal';
-    if (this.companion) {
-      const c = this.companion;
-      const cp = m.nearestFree(p.x - 24, p.y + 8, 4);
+    p.jump = null;
+    p.z = 0;
+    m.settle(p);
+    if (p.mounted && m.kind !== 'wild' && m.kind !== 'city') p.dismount(false);
+    this.party.forEach((c, i) => {
+      const cp = m.nearestFree(p.x - 24 - i * 22, p.y + 8 + i * 10, 4);
       c.x = cp.x;
       c.y = cp.y;
       c.kbx = c.kby = 0;
       c.target = null;
+      m.settle(c);
       if (c.st !== 'down') c.st = 'follow';
-    }
+    });
+    this.breakables = m.breakSpots.map((b) => new Breakable(b.kind, b.x, b.y, m.kind === 'abyss' ? 8 + m.floor : REALMS[m.realm].levels[1]));
+    for (const b of this.breakables) m.settle(b);
+    if (m.kind === 'wild' || m.kind === 'city') this.spawnAdventurers(m.kind === 'wild' ? 4 : 3);
+    if (G.save.pet) this.pet = new Pet(G.save.pet);
     const s = G.save;
     s.map = id;
     if (m.kind === 'city') s.lastCity = m.realm;
@@ -284,20 +326,237 @@ export class World {
     return team === 'player' ? this.enemies : team === 'enemy' ? this.allies : [];
   }
 
+  /** rebuilds the companion party from save.party (max two) */
+  setParty(): void {
+    const keep = this.party;
+    this.party = [];
+    const p = G.player;
+    for (const id of G.save.party.slice(0, 2)) {
+      const def = COMPANION_BY_ID[id];
+      const cs = G.save.companions[id];
+      if (!def || !cs?.recruited) continue;
+      const old = keep.find((c) => c.def.id === id);
+      if (old) {
+        old.refresh();
+        this.party.push(old);
+        continue;
+      }
+      const c = new Companion(def, cs);
+      const pos = this.map.nearestFree(p.x - 26 - this.party.length * 20, p.y + 10, 4);
+      c.x = pos.x;
+      c.y = pos.y;
+      this.map.settle(c);
+      this.party.push(c);
+    }
+  }
+
+  /** legacy entry point: adds / clears companions through the party list */
   setCompanion(id: string | null): void {
-    if (!id) {
-      this.companion = null;
+    if (id && !G.save.party.includes(id)) G.save.party = [...G.save.party, id].slice(-2);
+    if (!id) G.save.party = [];
+    this.setParty();
+  }
+
+  setPet(id: string | null): void {
+    G.save.pet = id;
+    this.pet = id ? new Pet(id) : null;
+  }
+
+  private spawnAdventurers(n: number): void {
+    const m = this.map;
+    const R = REALMS[m.realm];
+    const used = new Set<string>();
+    for (let i = 0; i < n; i++) {
+      let name = pick(ADVENTURER_NAMES);
+      for (let k = 0; k < 6 && used.has(name); k++) name = pick(ADVENTURER_NAMES);
+      used.add(name);
+      const pos = m.nearestFree(rnd(6, m.w - 6) * TILE, rnd(8, m.h - 6) * TILE, 5);
+      const lvl = Math.min(60, rndi(R.levels[0], R.levels[1] + 2));
+      const a = new Adventurer(name, lvl, pos.x, pos.y);
+      m.settle(a);
+      this.adventurers.push(a);
+    }
+  }
+
+  adventurerAssisted(a: Adventurer): void {
+    const s = G.save;
+    a.rewardCd = 180;
+    a.say('You saved me! Please, take this.', 3.5);
+    const lvl = Math.max(a.level, s.level);
+    this.spawnLoot(a.x + 16, a.y + 8, { gold: 40 + lvl * 8, items: [[pick(REALMS[this.map.realm].ores), rndi(2, 4)], ['enh_stone', 1]], gear: Math.random() < 0.35 ? [randomGear(lvl, 1)] : [], rarity: 2 }, 'chest');
+    s.adventurerRep[a.advName] = (s.adventurerRep[a.advName] ?? 0) + 25;
+    s.guilds[a.guildId] = (s.guilds[a.guildId] ?? 0) + 10;
+    s.counters.assists++;
+    style.add(60, 'Assist');
+    G.ui.toast(`${a.advName} rewards you with a chest for the assist (+10 reputation with their guild).`, 'loot');
+    checkAchievements(true);
+  }
+
+  // ---------------------------------------------------------------- duels
+
+  startDuel(a: Adventurer): void {
+    if (this.duel || G.player.dead) return;
+    a.dueling = true;
+    a.hp = a.stats.maxHp;
+    a.target = null;
+    a.casting?.cancel();
+    a.casting = null;
+    a.st = 'follow';
+    const p = G.player;
+    const ang = Math.atan2(a.y - p.y, a.x - p.x);
+    const pos = this.map.nearestFree(p.x + Math.cos(ang) * 120, p.y + Math.sin(ang) * 90, 3);
+    a.x = pos.x;
+    a.y = pos.y;
+    this.duel = { adv: a, phase: 'count', t: 3.2, shown: 4 };
+    fx.banner('FRIENDLY DUEL', '#ffd166', `${a.advName} - first to drop below 10% HP loses`, 44, 1.4);
+    audio.play('engage');
+  }
+
+  private updateDuel(dt: number): void {
+    const d = this.duel;
+    if (!d) return;
+    const a = d.adv;
+    if (a.dead || a.removed || G.player.dead) {
+      this.endDuel(false, true);
       return;
     }
-    const def = COMPANION_BY_ID[id];
-    const cs = G.save.companions[id];
-    if (!def || !cs) return;
-    const c = new Companion(def, cs);
+    if (d.phase === 'count') {
+      d.t -= dt;
+      const n = Math.ceil(d.t);
+      if (n < d.shown && n >= 1) {
+        d.shown = n;
+        fx.banner(String(n), '#ffd166', '', 90, 0.8);
+        audio.play('ui');
+      }
+      a.aim = Math.atan2(G.player.y - a.y, G.player.x - a.x);
+      if (d.t <= 0) {
+        d.phase = 'fight';
+        a.team = 'enemy';
+        fx.banner('DUEL!', '#ff5d6c', '', 90, 0.9);
+        audio.play('switch');
+      }
+    } else if (dist(a.x, a.y, G.player.x, G.player.y) > 700) this.endDuel(false, true);
+  }
+
+  /** duels never kill: the loser is clamped at 10% HP and the duel ends */
+  duelClamp(t: Actor, src: Actor | null, dmg: number): number {
+    const d = this.duel;
+    if (!d || d.phase !== 'fight') return dmg;
+    const a = d.adv;
+    if (t === a) {
+      const floor = a.stats.maxHp * 0.1;
+      if (a.hp - dmg <= floor) {
+        this.after(0, () => this.endDuel(true, false));
+        return Math.max(0, Math.floor(a.hp - floor));
+      }
+    } else if (t === G.player && src === a) {
+      const floor = t.stats.maxHp * 0.1;
+      if (t.hp - dmg <= floor) {
+        this.after(0, () => this.endDuel(false, false));
+        return Math.max(0, Math.floor(t.hp - floor));
+      }
+    }
+    return dmg;
+  }
+
+  private endDuel(won: boolean, aborted: boolean): void {
+    const d = this.duel;
+    if (!d) return;
+    this.duel = null;
+    const a = d.adv;
+    a.dueling = false;
+    a.team = 'player';
+    a.target = null;
+    a.casting?.cancel();
+    a.casting = null;
+    a.hp = a.stats.maxHp;
+    a.clearDebuffs();
+    const s = G.save;
+    if (aborted) {
+      G.ui.toast('The duel was called off.', 'info');
+      return;
+    }
+    if (won) {
+      s.counters.duelsWon++;
+      const gold = 60 + a.level * 12;
+      s.gold += gold;
+      s.adventurerRep[a.advName] = (s.adventurerRep[a.advName] ?? 0) + 15;
+      fx.banner('DUEL WON', '#ffd166', `${a.advName} yields! +${gold} G`, 56, 1.8);
+      a.say('Well fought! You are the real deal.', 3.5);
+      audio.play('levelup', 0.7);
+      style.add(150, 'Duel Won');
+    } else {
+      fx.banner('DUEL LOST', '#ff9a3d', `${a.advName} wins this round`, 52, 1.6);
+      a.say('Good match! Train up and try me again.', 3.5);
+      G.player.hp = Math.max(G.player.hp, G.player.stats.maxHp * 0.1);
+    }
+    checkAchievements(true);
+  }
+
+  // ---------------------------------------------------------------- raids
+
+  /** Assault Team raid: three Ivory Aegis vanguards join the Diver and up to two companions */
+  spawnVanguard(): void {
     const p = G.player;
-    const pos = this.map.nearestFree(p.x - 26, p.y + 10, 4);
-    c.x = pos.x;
-    c.y = pos.y;
-    this.companion = c;
+    const lvl = Math.max(G.save.level, this.map.kind === 'dungeon' ? REALMS[this.map.realm].levels[1] : G.save.level);
+    this.vanguard = vanguardNames().map((name, i) => {
+      const v = new Vanguard(name, i, lvl);
+      const pos = this.map.nearestFree(p.x - 40 + i * 40, p.y + 30, 4);
+      v.x = pos.x;
+      v.y = pos.y;
+      this.map.settle(v);
+      fx.burst(v.x, v.y - 18, '#ffd27a', 14, 110);
+      return v;
+    });
+    audio.play('teleport', 0.7);
+    fx.banner('ASSAULT TEAM ASSEMBLED', '#ffd27a', `${1 + this.party.length + this.vanguard.length}-hero raid`, 44, 1.6);
+  }
+
+  beginRaid(m: Monster, vanguard: boolean): void {
+    this.raid = { boss: m, roaming: true };
+    if (vanguard) this.spawnVanguard();
+    m.alwaysAggro = true;
+    m.target = G.player;
+    m.st = 'chase';
+    this.boss = m;
+    const R = REALMS[this.map.realm];
+    audio.setMusic('boss', R.music.root, true);
+    fx.banner(m.def.name, '#ff5d6c', m.def.title ?? 'Raid Boss', 50, 2.2);
+    audio.play('roar');
+  }
+
+  private endRaid(win: boolean): void {
+    const r = this.raid;
+    this.raid = null;
+    const s = G.save;
+    if (win) {
+      if (this.vanguard.length) s.counters.raidsWon++;
+      if (r?.roaming && r.boss && !s.raidBosses.includes(r.boss.def.id)) s.raidBosses.push(r.boss.def.id);
+      fx.banner('RAID CLEARED', '#ffd166', 'The Assault Team stands victorious', 60, 2.2);
+      audio.play('levelup');
+    }
+    if (this.vanguard.length) {
+      this.after(4, () => {
+        for (const v of this.vanguard) fx.burst(v.x, v.y - 18, '#ffd27a', 12, 100);
+        if (this.vanguard.length) G.ui.toast('The Vanguard knights salute you and teleport back to the Ivory Aegis hall.', 'info');
+        this.vanguard = [];
+      });
+    }
+    const R = REALMS[this.map.realm];
+    audio.setMusic(this.map.music, R.music.root, R.music.minor);
+    checkAchievements(true);
+  }
+
+  continueTripleSwitch(c: Companion, target: Actor): void {
+    if (c.dead || target.dead) return;
+    G.game.slowmo(0.3, 0.25);
+    fx.banner('TRIPLE SWITCH!', '#7fe9ff', `${c.def.name}: ${c.def.chain}!`, 80, 1.2);
+    audio.play('switch');
+    c.performChain(target);
+    G.player.chainT = 4;
+    G.save.counters.tripleSwitches++;
+    style.add(160, 'Triple Switch');
+    checkAchievements(true);
   }
 
   // ---------------------------------------------------------------- events
@@ -319,6 +578,12 @@ export class World {
   private onBossDefeated(m: Monster): void {
     const br = this.map.bossRoom;
     const s = G.save;
+    if (m.raid) {
+      this.boss = null;
+      s.counters.bossKills++;
+      this.endRaid(true);
+      return;
+    }
     if (this.rushQueue.length && br) {
       const next = this.rushQueue.shift() as string;
       this.boss = null;
@@ -340,6 +605,7 @@ export class World {
       floorCleared();
       return;
     }
+    if (this.raid) this.endRaid(true);
     if (this.map.kind !== 'dungeon' || !br) return;
     const realm = this.map.realm;
     onBossBounty(m.def.id);
@@ -385,17 +651,27 @@ export class World {
     if (!br) return;
     br.started = true;
     for (const idx of br.doorCells) this.map.solid[idx] = SOL.WALL;
-    const c = this.companion;
-    if (c && !c.dead) {
-      const p = this.map.nearestFree(G.player.x, G.player.y + 20, 3);
+    this.party.forEach((c, i) => {
+      if (c.dead) return;
+      const p = this.map.nearestFree(G.player.x - 20 + i * 40, G.player.y + 20, 3);
       c.x = p.x;
       c.y = p.y;
-    }
+    });
     const ids = br.boss.startsWith('rush:') ? br.boss.slice(5).split(',') : [br.boss];
     this.rushQueue = ids.slice(1);
-    const R = REALMS[this.map.realm];
-    audio.setMusic('boss', R.music.root, true);
-    this.spawnBoss(ids[0], br.level);
+    const go = (vanguard: boolean) => {
+      if (vanguard) {
+        this.spawnVanguard();
+        this.raid = { boss: null as unknown as Monster, roaming: false };
+      }
+      const R = REALMS[this.map.realm];
+      audio.setMusic('boss', R.music.root, true);
+      this.spawnBoss(ids[0], br.level);
+      if (this.raid && !this.raid.roaming && this.boss) this.raid.boss = this.boss;
+    };
+    const def = MONSTERS[ids[0]];
+    if (this.map.kind === 'dungeon' && def) G.ui.openRaidBriefing(def.name, BOSSES[ids[0]]?.intro ?? '', br.level, go);
+    else go(false);
   }
 
   private eliteKey(): string {
@@ -432,7 +708,7 @@ export class World {
       G.ui.toast('Recruit a companion at a Guild Hall to use SWITCH!', 'info');
       return;
     }
-    if (c.dead || p.dead) return;
+    if (c.dead || p.dead || this.duel) return;
     if (p.switchGauge < 100) {
       audio.play('error');
       return;
@@ -465,7 +741,11 @@ export class World {
     p.blocking = false;
     for (const m of this.monsters) if (m.target === p && m.tauntT <= 0) m.target = c;
     c.performChain(target);
+    const second = this.party.find((o) => o !== c && !o.dead);
+    if (second) c.nextChain = { c: second, target };
     p.chainT = 4;
+    if (p.mounted) p.dismount(false);
+    style.add(90, 'Switch');
   }
 
   interactNearest(): void {
@@ -506,12 +786,31 @@ export class World {
       } else if (tr.phase === 'in' && tr.t >= 0.35) this.transition = null;
       if (tr.phase === 'out') return;
     }
-    this.enemies = this.monsters.filter((m) => !m.dead);
-    this.allies = [p, ...(this.companion && !this.companion.dead ? [this.companion] : [])].filter((a) => !a.dead);
+    const duelAdv = this.duel?.phase === 'fight' ? this.duel.adv : null;
+    this.enemies = [...this.monsters.filter((m) => !m.dead), ...this.breakables.filter((b) => !b.dead), ...(duelAdv ? [duelAdv] : [])];
+    this.allies = [
+      p,
+      ...(this.duel ? [] : this.party),
+      ...this.vanguard,
+      ...this.adventurers.filter((a) => !a.dueling),
+      ...(this.caravan ? [this.caravan] : []),
+    ].filter((a) => !a.dead);
     this.updateClock(dt);
     this.updateZones(dt);
+    style.update(dt);
+    tickPowers(dt);
     p.update(dt);
-    if (this.companion) this.companion.update(dt);
+    for (const c of this.party) c.update(dt);
+    for (const v of this.vanguard) v.update(dt);
+    for (const a of this.adventurers) a.update(dt);
+    for (const s of this.shadows) s.update(dt);
+    this.shadows = this.shadows.filter((s) => !s.removed);
+    this.adventurers = this.adventurers.filter((a) => !a.removed);
+    for (const b of this.breakables) b.update(dt);
+    this.breakables = this.breakables.filter((b) => !b.removed);
+    this.caravan?.update(dt);
+    this.pet?.update(dt);
+    for (const a of [p, ...this.party, ...this.vanguard, ...this.adventurers, ...this.monsters]) if (!a.dead && a.statuses.length) tickDots(a, dt);
     for (const m of this.monsters) m.update(dt);
     for (const n of this.npcs) n.update(dt);
     for (const pr of this.projectiles) pr.update(dt);
@@ -571,6 +870,18 @@ export class World {
       if (tx > br.x + 1 && tx < br.x + br.w - 1 && ty > br.y + 1 && ty < br.y + br.h - 1) this.startBoss();
     }
     if (this.map.kind === 'arena') arena.update(dt);
+    this.updateDuel(dt);
+    this.updatePads(dt);
+    if (this.map.kind === 'wild') {
+      updateEvents(dt);
+      checkRaidApproach();
+    }
+    if (this.raid && this.raid.boss && this.raid.boss.dead && this.boss === null && this.raid.roaming) this.raid = null;
+    this.achT -= dt;
+    if (this.achT <= 0) {
+      this.achT = 3;
+      checkAchievements();
+    }
     this.updateNearest();
     if (!this.transition && !p.dead) {
       for (const e of this.map.exits) {
@@ -618,7 +929,7 @@ export class World {
 
   private updateZones(dt: number): void {
     const p = G.player;
-    const actors: Actor[] = [p, ...(this.companion ? [this.companion] : []), ...this.monsters];
+    const actors: Actor[] = [p, ...this.party, ...this.vanguard, ...this.adventurers, ...this.monsters];
     for (const a of actors) {
       a.slowZone = 0;
       a.inCitadel = false;
@@ -774,9 +1085,10 @@ export class World {
     const b = l.bundle;
     const parts: string[] = [];
     if (b.gold > 0) {
-      G.save.gold += b.gold;
-      parts.push(`+${b.gold} G`);
-      fx.number(l.x, l.y - 30, `+${b.gold} G`, '#ffd166', 14);
+      const gold = Math.round(b.gold * (hasPower('p_midas') ? 1.3 : 1));
+      G.save.gold += gold;
+      parts.push(`+${gold} G`);
+      fx.number(l.x, l.y - 30, `+${gold} G`, '#ffd166', 14);
       audio.play('coin', 0.7);
     }
     for (const [id, n] of b.items) {
@@ -784,10 +1096,19 @@ export class World {
       parts.push(`${itemDef(id).name}${n > 1 ? ' x' + n : ''}`);
     }
     const left: GearItem[] = [];
+    let salvaged = 0;
     for (const g of b.gear) {
-      if (addGear(g)) parts.push(`[${['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'][g.rarity]}] ${g.name}`);
+      if (G.save.autoSalvage && g.rarity <= 1 && !g.set && !g.unique) {
+        for (const [id, n] of salvageYield(g)) addItem(id, n);
+        salvaged++;
+        continue;
+      }
+      this.wardrobeUnlock(g);
+      if (addGear(g)) parts.push(`[${RARITY_NAMES[g.rarity]}] ${g.name}`);
       else left.push(g);
+      if (g.rarity >= 2) audio.chord(g.rarity);
     }
+    if (salvaged) parts.push(`Auto-salvaged ${salvaged} item${salvaged > 1 ? 's' : ''}`);
     if (left.length) {
       G.ui.toast('Inventory full! Gear left on the ground.', 'warn');
       this.spawnLoot(l.x + 10, l.y + 10, { gold: 0, items: [], gear: left, rarity: l.rarity }, 'crystal');
@@ -796,12 +1117,41 @@ export class World {
     audio.play('pickup', 0.8);
   }
 
+  /** every gear look ever owned joins the transmog wardrobe */
+  wardrobeUnlock(g: GearItem): void {
+    const key = `${g.baseId}|${g.style}|${g.tier}|${g.colors.main}|${g.colors.accent}|${g.colors.trim}|${g.colors.glow}`;
+    const w = G.save.wardrobe;
+    if (!w.includes(key)) w.push(key);
+  }
+
+  private updatePads(dt: number): void {
+    const p = G.player;
+    for (const pad of this.map.pads) {
+      if (pad.cd > 0) {
+        pad.cd -= dt;
+        continue;
+      }
+      if (p.st === 'normal' && !p.dead && Math.hypot(p.x - pad.x, p.y - pad.y) < 15) {
+        pad.cd = 1.2;
+        p.jumpTo(pad.tx, pad.ty);
+        fx.ring(pad.x, pad.y, '#7fe9ff', 6, 46, 0.4, 4);
+      }
+    }
+  }
+
   private integrate(dt: number): void {
     const p = G.player;
-    const all: Actor[] = [p, ...(this.companion ? [this.companion] : []), ...this.monsters];
+    const all: Actor[] = [p, ...this.party, ...this.vanguard, ...this.adventurers, ...this.monsters];
+    const slamMin = G.save.keystones.includes('ks_spear') ? 105 : 150;
     for (const a of all) {
       if (Math.abs(a.kbx) + Math.abs(a.kby) > 2) {
-        this.map.move(a, a.kbx * dt, a.kby * dt, a.flying);
+        if (a.kind === 'monster' && (a as Monster).def.speed === 0) {
+          a.kbx = a.kby = 0;
+          continue;
+        }
+        const speed = Math.hypot(a.kbx, a.kby);
+        const res = this.map.move(a, a.kbx * dt, a.kby * dt, a.flying);
+        if ((res.hitX || res.hitY) && a.team === 'enemy' && a.kind === 'monster' && a.kbFresh > 0 && a.slamCd <= 0 && speed >= slamMin && !a.dead) wallSlam(a, res.hitX, res.hitY);
         const k = Math.max(0, 1 - 9 * dt);
         a.kbx *= k;
         a.kby *= k;
@@ -863,7 +1213,41 @@ export class World {
         best = { id: -100000 - n.id, x: n.x, y: n.y, r: 36, label: `Gather ${itemDef(n.item).name}`, action: { t: 'node', node: n.id } };
       }
     }
+    for (const a of this.adventurers) {
+      if (a.dead || a.dueling || a.target) continue;
+      const d = dist(p.x, p.y, a.x, a.y);
+      if (d < 44 && d < bd) {
+        bd = d;
+        best = { id: -200000 - a.id, x: a.x, y: a.y, r: 44, label: `Talk to ${a.advName} (Adventurer)`, action: { t: 'adventurer', id: a.id } };
+      }
+    }
+    this.map.fishSpots.forEach((f, i) => {
+      const d = dist(p.x, p.y, f.x, f.y);
+      if (d < 40 && d < bd) {
+        bd = d;
+        best = { id: -300000 - i, x: f.x, y: f.y, r: 40, label: 'Fish here (tension-bar fishing)', action: { t: 'fish', spot: i } };
+      }
+    });
+    if (this.map.kind === 'wild') {
+      for (const h of G.save.hunts) {
+        if (h.found || h.realm !== this.map.realm) continue;
+        const d = dist(p.x, p.y, h.x, h.y);
+        if (d < 40 && d < bd) {
+          bd = d;
+          best = { id: -400000, x: h.x, y: h.y, r: 40, label: 'Dig up the treasure', action: { t: 'dig', id: h.id } };
+        }
+      }
+    }
     this.nearest = best;
+  }
+
+  dig(id: string): void {
+    const h = G.save.hunts.find((x) => x.id === id && !x.found);
+    if (h) digTreasure(h);
+  }
+
+  adventurerById(id: number): Adventurer | null {
+    return this.adventurers.find((a) => a.id === id) ?? null;
   }
 
   nodeById(id: number): ResourceNode | null {

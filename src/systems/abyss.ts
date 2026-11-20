@@ -5,12 +5,13 @@ import { G } from '../core/state';
 import { onAbyssBounty } from './guilds';
 import { fx } from '../render/fx';
 import { audio } from '../engine/audio';
+import { store } from '../platform/desktop';
 
 const LB_KEY = 'aetheria.leaderboard';
 
 export function leaderboard(): LeaderEntry[] {
   try {
-    const raw = localStorage.getItem(LB_KEY);
+    const raw = store.get(LB_KEY);
     return raw ? (JSON.parse(raw) as LeaderEntry[]) : [];
   } catch {
     return [];
@@ -24,11 +25,7 @@ function recordLeader(floor: number): void {
   if (ex && ex.floor >= floor) return;
   const entry: LeaderEntry = { name: s.name, level: s.level, floor, date: new Date().toISOString().slice(0, 10) };
   const next = [...list.filter((e) => e.name !== s.name), entry].sort((a, b) => b.floor - a.floor).slice(0, 10);
-  try {
-    localStorage.setItem(LB_KEY, JSON.stringify(next));
-  } catch {
-    /* storage unavailable: leaderboard stays in memory only */
-  }
+  store.set(LB_KEY, JSON.stringify(next));
 }
 
 export function startAbyss(floor: number): void {

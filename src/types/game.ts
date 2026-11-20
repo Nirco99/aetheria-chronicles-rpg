@@ -76,6 +76,14 @@ export interface StatBlock {
   magPct?: number;
   hpPct?: number;
   xpPct?: number;
+  /** v3: fraction of damage dealt returned as HP */
+  lifesteal?: number;
+  /** v3: bonus Sword Skill damage fraction */
+  skillDmg?: number;
+  /** v3: cooldown reduction fraction */
+  cdr?: number;
+  /** v3: bonus rare-drop chance fraction */
+  magicFind?: number;
 }
 
 export interface Stats {
@@ -95,6 +103,10 @@ export interface Stats {
   xpMult: number;
   /** bonus elemental damage fraction added to hits, from gems and blade oils */
   elem: Partial<Record<Element, number>>;
+  lifesteal: number;
+  skillDmg: number;
+  cdr: number;
+  magicFind: number;
 }
 
 // ------------------------------------------------------------------ items & gear
@@ -126,6 +138,14 @@ export interface GearItem {
   forgedBy?: string;
   mythic?: boolean;
   colors: GearColors;
+  /** v3: rolled affixes (count by rarity), rerollable at the Arcane Enchanter */
+  affixes?: Affix[];
+  /** v3: golden legendary / unique power id (see data/v3 POWERS) */
+  power?: string;
+  /** v3: unique weapon id */
+  unique?: string;
+  /** v3: armor-set id */
+  set?: string;
 }
 
 export type IconShape =
@@ -537,7 +557,12 @@ export type InteractAction =
   | { t: 'sign'; text: string }
   | { t: 'furniture'; index: number }
   | { t: 'node'; node: number }
-  | { t: 'companion'; id: string };
+  | { t: 'companion'; id: string }
+  | { t: 'adventurer'; id: number }
+  | { t: 'fish'; spot: number }
+  | { t: 'dig'; id: string }
+  | { t: 'stable' }
+  | { t: 'blackmarket' };
 
 export interface Interactable {
   id: number;
@@ -679,6 +704,26 @@ export interface Appearance {
 
 export interface Counters {
   perfectParries: number;
+  skillConnects: number;
+  maxChain: number;
+  novas: number;
+  wallSlams: number;
+  reactions: number;
+  ripostes: number;
+  sssReached: number;
+  breakables: number;
+  fishCaught: number;
+  treasures: number;
+  eventsWon: number;
+  caravans: number;
+  duelsWon: number;
+  assists: number;
+  trades: number;
+  raidsWon: number;
+  tripleSwitches: number;
+  chargeSlams: number;
+  extracted: number;
+  uniquesFound: number;
   masterworks: number;
   dmgBlocked: number;
   kills: number;
@@ -738,6 +783,39 @@ export interface SaveData {
   abyss: { best: number; checkpoint: number };
   elitesSlain: string[];
   tutorialSeen: boolean;
+  // ---- v3.0 Full-Dive systems
+  /** Sword Skill ranks 1..5 */
+  skillRanks: Record<string, number>;
+  /** chosen Rune Morph per active skill (unlocked at skill rank 3) */
+  morphs: Record<string, MorphKind>;
+  keystones: string[];
+  bridges: string[];
+  /** extracted relic powers in the Aether Relic Codex */
+  codex: string[];
+  relics: Record<PowerSlot, string | null>;
+  /** unlocked appearance keys for the transmog wardrobe */
+  wardrobe: string[];
+  transmog: Partial<Record<EquipSlot, string>>;
+  dyes: { main: string | null; accent: string | null };
+  autoSalvage: boolean;
+  /** up to two companion ids fighting at your side */
+  party: string[];
+  gambit: Gambit;
+  affinity: Record<string, number>;
+  mounts: string[];
+  mount: string | null;
+  pets: string[];
+  pet: string | null;
+  achievements: string[];
+  title: string | null;
+  /** kills per monster id (Bestiary) */
+  bestiary: Record<string, number>;
+  reactionsSeen: ReactionKind[];
+  hunts: TreasureHunt[];
+  blackMarket: boolean;
+  fish: Record<string, number>;
+  raidBosses: string[];
+  adventurerRep: Record<string, number>;
 }
 
 export interface Settings {
@@ -747,6 +825,12 @@ export interface Settings {
   shake: boolean;
   numbers: boolean;
   fps: boolean;
+  /** v3 desktop */
+  fullscreen: boolean;
+  resolution: string;
+  /** render supersampling multiplier on top of devicePixelRatio */
+  quality: number;
+  styleMeter: boolean;
 }
 
 export interface LeaderEntry {
@@ -765,3 +849,161 @@ export interface SlotSummary {
   mode: WorldMode;
   saved: number;
 }
+
+// ====================================================================================
+// v3.0 FULL-DIVE DESKTOP EDITION - extended contract
+// ====================================================================================
+
+/** Rune Morphs: Power/Execution, Shadow-Clone/Mobility, Elemental Conversion/Leech */
+export type MorphKind = 'power' | 'clone' | 'leech';
+
+export interface MorphDef {
+  kind: MorphKind;
+  label: string;
+  desc: string;
+  color: string;
+}
+
+export interface KeystoneDef {
+  id: string;
+  name: string;
+  branch: Branch;
+  desc: string;
+  sp: number;
+  rank: number;
+  stats?: StatBlock;
+}
+
+export interface BridgeDef {
+  id: string;
+  name: string;
+  a: Branch;
+  b: Branch;
+  desc: string;
+  sp: number;
+  rank: number;
+  stats: StatBlock;
+}
+
+/** Elemental reaction gauges carried by every actor */
+export type GaugeKind = 'burn' | 'frost' | 'shock' | 'bleed' | 'venom' | 'aether';
+export type ReactionKind = 'melt' | 'shatter' | 'overload' | 'superconduct' | 'tempest' | 'singularity';
+
+export interface ReactionDef {
+  id: ReactionKind;
+  name: string;
+  a: GaugeKind;
+  /** null = reacts with any other gauge */
+  b: GaugeKind | null;
+  color: string;
+  desc: string;
+}
+
+export type AffixKind =
+  | 'atk' | 'mag' | 'def' | 'hp' | 'mp' | 'atkPct' | 'magPct' | 'defPct' | 'hpPct' | 'crit' | 'critDmg'
+  | 'aspd' | 'move' | 'brk' | 'block' | 'regen' | 'lifesteal' | 'skillDmg' | 'cdr' | 'magicFind' | 'xpPct';
+
+export interface Affix {
+  kind: AffixKind;
+  value: number;
+}
+
+export type PowerSlot = 'weapon' | 'armor' | 'utility';
+
+export interface PowerDef {
+  id: string;
+  name: string;
+  slot: PowerSlot;
+  desc: string;
+  color: string;
+  /** passive stat contribution while active */
+  stats?: StatBlock;
+}
+
+export interface UniqueDef {
+  id: string;
+  name: string;
+  baseId: string;
+  power: string;
+  flavor: string;
+  colors: GearColors;
+  stats: StatBlock;
+}
+
+export interface SetPieceDef {
+  baseId: string;
+  name: string;
+}
+
+export interface SetDef {
+  id: string;
+  name: string;
+  color: string;
+  theme: string;
+  pieces: SetPieceDef[];
+  colors: GearColors;
+  b2: { desc: string; stats: StatBlock };
+  b4: { desc: string; stats: StatBlock };
+  b6: { desc: string; power: string };
+}
+
+export type Gambit = 'assault' | 'guard' | 'focus' | 'support';
+
+export interface AchievementDef {
+  id: string;
+  name: string;
+  desc: string;
+  title?: string;
+  cat: 'combat' | 'world' | 'craft' | 'social' | 'legend';
+  check: (s: SaveData) => boolean;
+}
+
+export interface MountDef {
+  id: string;
+  name: string;
+  kind: 'horse' | 'wolf' | 'stag' | 'drake' | 'gryphon';
+  desc: string;
+  price: number;
+  speed: number;
+  colors: [string, string, string];
+  req: number;
+}
+
+export interface PetDef {
+  id: string;
+  name: string;
+  element: Element;
+  color: string;
+  color2: string;
+  desc: string;
+  price: number;
+  req: number;
+}
+
+export interface FishDef {
+  id: string;
+  name: string;
+  realm: number;
+  rarity: Rarity;
+  /** 0..1 how erratic the fish is in the tension bar */
+  diff: number;
+  value: number;
+}
+
+export interface TreasureHunt {
+  id: string;
+  realm: number;
+  x: number;
+  y: number;
+  found: boolean;
+}
+
+export interface RaidBossInfo {
+  id: string;
+  name: string;
+  title: string;
+  realm: number;
+  desc: string;
+}
+
+export type WorldEventKind = 'outbreak' | 'caravan';

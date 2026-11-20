@@ -18,7 +18,7 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
-      if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F1'].includes(e.code)) e.preventDefault();
+      if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F1', 'F2', 'F3', 'F4', 'F5'].includes(e.code)) e.preventDefault();
       if (!this.down.has(e.code)) this.pressedSet.add(e.code);
       this.down.add(e.code);
     });

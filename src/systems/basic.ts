@@ -44,9 +44,11 @@ export function reachOf(mode: WeaponMode, bonus = 0): number {
 }
 
 /** resolves one basic attack hit; returns number of enemies struck */
-export function basicHit(a: Actor, mode: WeaponMode, idx: number, aim: number, branch: Branch | null, color: string, reachBonus: number, multScale = 1): number {
+export function basicHit(a: Actor, mode: WeaponMode, idx: number, aim: number, branch: Branch | null, color: string, reachBonus: number, multScale = 1, forceCrit = false): number {
+  // the player's hitboxes are 15% wider than the ribbon on screen (asymmetric, forgiving)
+  const wide = a.kind === 'player' ? 1.15 : 1;
   if (mode === 'bow') {
-    G.world.spawnProjectile(a, { kind: 'arrow', speed: 780, mult: 1.0 * multScale, range: 560, brk: 4, color }, aim, a.x, a.y, branch);
+    G.world.spawnProjectile(a, { kind: 'arrow', speed: 780, mult: 1.0 * multScale, range: 560, brk: 4, color, pierce: forceCrit }, aim, a.x, a.y, branch);
     audio.play('arrow', a.kind === 'player' ? 1 : 0.5);
     return 0;
   }
@@ -60,19 +62,19 @@ export function basicHit(a: Actor, mode: WeaponMode, idx: number, aim: number, b
   const brkBase = mode === 'fists' ? 1 : mode === 'dual' ? WEAPON_INFO.twinblade.brk : WEAPON_INFO[mode].brk;
   let n = 0;
   if (c.shape === 'line') {
-    const shape = { kind: 'line' as const, x: a.x, y: a.y, a: aim, len: reach, w: c.arc };
+    const shape = { kind: 'line' as const, x: a.x, y: a.y, a: aim, len: reach, w: c.arc * wide };
     fx.ribbon(a.x, a.y, aim, { a0: 0, a1: 0, style: 'thrust', len: reach, w: 9 }, color, '#ffffff');
     for (const t of targetsOf(a)) {
       if (t.dead || !hitTest(shape, t.x, t.y, t.radius)) continue;
-      damage(a, t, { mult: c.mult * multScale, brk: c.brk + brkBase, kb: c.kb, kbAngle: aim, source: 'basic', branch });
+      damage(a, t, { mult: c.mult * multScale, brk: c.brk + brkBase, kb: c.kb, kbAngle: aim, source: 'basic', branch, forceCrit });
       n++;
     }
   } else {
-    const shape = { kind: 'cone' as const, x: a.x, y: a.y, a: aim, arc: c.arc, r: reach };
+    const shape = { kind: 'cone' as const, x: a.x, y: a.y, a: aim, arc: Math.max(c.arc, Math.abs(c.a1 - c.a0)) * wide, r: reach };
     fx.ribbon(a.x, a.y, aim, { a0: c.a0, a1: c.a1, r: reach * 0.82, w: mode === 'halberd' ? 13 : 10 }, color, '#ffffff');
     for (const t of targetsOf(a)) {
       if (t.dead || !hitTest(shape, t.x, t.y, t.radius)) continue;
-      damage(a, t, { mult: c.mult * multScale, brk: c.brk + brkBase, kb: c.kb, source: 'basic', branch });
+      damage(a, t, { mult: c.mult * multScale, brk: c.brk + brkBase, kb: c.kb, source: 'basic', branch, forceCrit });
       n++;
     }
   }

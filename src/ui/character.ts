@@ -161,7 +161,7 @@ function giveToCompanion(id: string, g: GearItem, slotOverride?: CompanionSlot):
   const old = cs.equip[slot];
   cs.equip[slot] = g;
   if (old) G.save.gear.push(old);
-  G.world.companion?.refresh();
+  for (const pc of G.world.party) pc.refresh();
   audio.play('ui');
   G.ui.toast(`${def.name} equipped ${gearTitle(g)}.`, 'info');
   selGear = null;
@@ -173,11 +173,10 @@ function inventoryTab(b: HTMLElement): void {
   const cats: [ItemCategory, string][] = [['consumable', 'Potions & Oils'], ['food', 'Food'], ['material', 'Materials'], ['gem', 'Gems'], ['furniture', 'Furniture'], ['trophy', 'Trophies']];
   const ids = Object.keys(s.items).filter((id) => ITEMS[id] && ITEMS[id].cat === itemCat).sort((a, c) => itemDef(a).name.localeCompare(itemDef(c).name));
   const grid = h('div', { class: 'grid scroll' }, ...ids.map((id) => {
+    const usable = !!itemDef(id).effect || id === 'treasure_map';
     const cell = itemCell(id, s.items[id], () => {
-      if (itemDef(id).effect) {
-        if (useConsumable(id)) G.ui.refresh();
-      }
-    }, { extra: itemDef(id).effect ? '<div class="tt-note">Click to use. Assign to a quick slot below.</div>' : '' });
+      if (usable && useConsumable(id)) G.ui.refresh();
+    }, { extra: id === 'treasure_map' ? '<div class="tt-note">Click to read the map and mark a dig site.</div>' : usable ? '<div class="tt-note">Click to use. Assign to a quick slot below.</div>' : '' });
     return cell;
   }));
   const quick = h('div', { class: 'quick-assign' }, h('b', { text: 'Quick slots: ' }), ...QUICK_KEYS.map((k, i) => {
@@ -194,10 +193,16 @@ function inventoryTab(b: HTMLElement): void {
     });
     return h('span', { class: 'qa' }, h('kbd', { text: k }), sel);
   }));
+  const salvage = h('input', { type: 'checkbox', checked: s.autoSalvage }) as HTMLInputElement;
+  salvage.addEventListener('change', () => {
+    s.autoSalvage = salvage.checked;
+    G.ui.toast(s.autoSalvage ? 'Smart Auto-Salvage on: Common and Uncommon drops (except set pieces and uniques) become materials.' : 'Smart Auto-Salvage off.', 'info');
+  });
   b.append(
     h('div', { class: 'tabs small' }, ...cats.map(([c, n]) => h('button', { class: 'tab' + (itemCat === c ? ' on' : ''), text: n, onclick: () => { itemCat = c; G.ui.refresh(); } }))),
     ids.length ? grid : h('div', { class: 'dim pad', text: 'Nothing here yet.' }),
     quick,
+    h('label', { class: 'check', title: 'Common and Uncommon gear is salvaged into ingots and Arcane Dust the moment you pick it up.' }, salvage, h('span', { text: ' Smart Auto-Salvage (Common & Uncommon drops become ingots and Arcane Dust)' })),
   );
 }
 
@@ -247,6 +252,7 @@ function masteryTab(b: HTMLElement): void {
         row.appendChild(btn(m.rank < sk.rank ? `Rank ${sk.rank}` : `Learn (${sk.sp} SP)`, () => {
           s.sp -= sk.sp;
           s.learned.push(sk.id);
+          s.skillRanks[sk.id] = 1;
           const free = s.hotbar.indexOf(null);
           if (free >= 0) s.hotbar[free] = sk.id;
           audio.play('levelup');
@@ -334,12 +340,12 @@ function companionsTab(b: HTMLElement): void {
   const listEl = h('div', { class: 'comp-list' });
   for (const c of COMPANIONS) {
     const r = s.companions[c.id]?.recruited;
-    const active = s.activeCompanion === c.id;
+    const active = s.party.includes(c.id);
     listEl.append(h('div', { class: 'comp' + (active ? ' on' : '') + (r ? '' : ' locked'), onclick: () => { if (r) { compSel = c.id; G.ui.refresh(); } } },
       h('b', { text: c.name }), h('small', { text: c.title }), h('small', { class: 'dim', text: r ? (active ? 'In your party' : 'Recruited') : `Found in ${REALMS[c.city].city}` })));
   }
   b.append(listEl);
-  const id = compSel && s.companions[compSel]?.recruited ? compSel : s.activeCompanion;
+  const id = compSel && s.companions[compSel]?.recruited ? compSel : s.party[0] ?? null;
   if (!id) return;
   const def = COMPANION_BY_ID[id];
   const cs = s.companions[id];
@@ -351,7 +357,7 @@ function companionsTab(b: HTMLElement): void {
       if (G.save.gear.length >= GEAR_CAPACITY) return G.ui.toast('Inventory full.', 'warn');
       cs.equip[sl] = null;
       G.save.gear.push(g);
-      G.world.companion?.refresh();
+      for (const pc of G.world.party) pc.refresh();
       G.ui.refresh();
     }, { compare: false }) : h('div', { class: 'cell empty' }));
     return wrap;
@@ -360,7 +366,7 @@ function companionsTab(b: HTMLElement): void {
   b.append(section(`${def.name} - ${def.title}`,
     h('p', { class: 'dim', text: def.bio }),
     h('div', { class: 'row' },
-      s.activeCompanion === id ? btn('Dismiss from party', () => { dismissCompanion(); G.ui.refresh(); }, 'ghost') : btn('Summon to party', () => { const e = recruit(id); if (e) G.ui.toast(e, 'warn'); G.ui.refresh(); }, 'primary'),
+      s.party.includes(id) ? btn('Dismiss from party', () => { dismissCompanion(id); G.ui.refresh(); }, 'ghost') : btn(`Summon to party (${s.party.length}/2)`, () => { const e = recruit(id); if (e) G.ui.toast(e, 'warn'); G.ui.refresh(); }, 'primary'),
       h('span', { class: 'dim', text: `Synchronized Chain Skill: ${def.chain}` })),
     h('div', { class: 'dim small', text: 'Click an equipped piece to take it back; click an item below to give it.' }),
     eq, giveGrid));

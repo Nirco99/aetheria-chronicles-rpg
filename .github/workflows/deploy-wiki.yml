@@ -1,4 +1,7 @@
-name: Deploy Wiki & Web Build to GitHub Pages
+name: Deploy Strategy Wiki to GitHub Pages
+
+# The game is a standalone Windows desktop application (Electron) and is never deployed to the web.
+# Only the bilingual strategy wiki in wiki/ is published, at the site root and at /wiki/.
 
 on:
   push:
@@ -21,19 +24,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies (skip the Electron binary - not needed for the web build)
-        run: npm ci
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-
-      - name: Typecheck and build (game at /, bilingual wiki at /wiki/)
-        run: npm run build
+      - name: Assemble the wiki site
+        run: |
+          mkdir -p site/wiki
+          cp -r wiki/. site/
+          cp -r wiki/. site/wiki/
+          touch site/.nojekyll
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -41,7 +37,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
 
   deploy:
     needs: build

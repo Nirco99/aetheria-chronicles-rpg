@@ -134,13 +134,19 @@ export function recruit(id: string): string | null {
     G.ui.toast(`${def.name} joined your party!`, 'mastery');
     audio.play('levelup');
   }
-  s.activeCompanion = id;
-  G.world.setCompanion(id);
+  if (!s.party.includes(id)) {
+    if (s.party.length >= 2) return 'Your party is full (2 companions). Dismiss one first.';
+    s.party.push(id);
+  }
+  s.activeCompanion = s.party[0] ?? null;
+  G.world.setParty();
   G.world.npcs = G.world.npcs.filter((n) => n.spawn.companion !== id);
   return null;
 }
 
-export function dismissCompanion(): void {
-  G.save.activeCompanion = null;
-  G.world.setCompanion(null);
+export function dismissCompanion(id?: string): void {
+  const s = G.save;
+  s.party = id ? s.party.filter((x) => x !== id) : [];
+  s.activeCompanion = s.party[0] ?? null;
+  G.world.setParty();
 }

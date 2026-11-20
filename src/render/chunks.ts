@@ -3,10 +3,88 @@
 // loop draws ~20 chunk images per frame instead of ~800 individual tiles. Animated liquids
 // are still drawn per tile on top.
 import type { GameMap } from '../world/tilemap';
-import { GT, SOL } from '../world/tilemap';
+import { ELEV, ELEV_H, GT, SOL } from '../world/tilemap';
 import { TILE, WALL_H } from '../data/constants';
-import { groundTile, shoreTile, wallTop } from './tilecache';
-import { hash2 } from '../engine/util';
+import { groundTile, shoreTile, wallFace, wallTop } from './tilecache';
+import { hash2, rgba } from '../engine/util';
+
+/** bridge rails along the edges that face open water */
+function bakeRails(g: CanvasRenderingContext2D, m: GameMap, x0: number, y0: number): void {
+  for (let ty = y0; ty < Math.min(m.h, y0 + CH); ty++) {
+    for (let tx = x0; tx < Math.min(m.w, x0 + CH); tx++) {
+      if (m.ground[ty * m.w + tx] !== GT.BRIDGE) continue;
+      for (const side of [-1, 1]) {
+        const n = m.gr(tx + side, ty);
+        if (n === GT.BRIDGE) continue;
+        const rx = side < 0 ? tx * TILE + 2 : (tx + 1) * TILE - 4;
+        g.fillStyle = 'rgba(0,0,0,0.28)';
+        g.fillRect(rx + side * 3, ty * TILE + 4, 3, TILE);
+        g.fillStyle = '#5a3a20';
+        g.fillRect(rx, ty * TILE, 2.4, TILE);
+        g.fillStyle = '#3a2414';
+        for (let py = 4; py < TILE; py += 14) g.fillRect(rx - 0.8, ty * TILE + py - 6, 4, 8);
+        g.fillStyle = '#c9a46e';
+        g.fillRect(rx + 0.4, ty * TILE, 0.8, TILE);
+      }
+    }
+  }
+}
+
+/** plateau tops (lifted by ELEV_H), oblique rock faces and carved stone stairs */
+function bakeElevation(g: CanvasRenderingContext2D, m: GameMap, x0: number, y0: number): void {
+  if (!m.hasElev) return;
+  for (let ty = Math.max(0, y0 - 1); ty < Math.min(m.h, y0 + CH + 1); ty++) {
+    for (let tx = x0; tx < Math.min(m.w, x0 + CH); tx++) {
+      const i = ty * m.w + tx;
+      if (m.elev[i] !== ELEV.PLATEAU) continue;
+      const v = Math.floor(hash2(tx, ty, 7) * 4);
+      const px = tx * TILE;
+      const py = ty * TILE - ELEV_H;
+      g.drawImage(groundTile(m.realm, m.ground[i], v, 0), px, py, TILE, TILE);
+      g.fillStyle = 'rgba(255,255,240,0.06)';
+      g.fillRect(px, py, TILE, TILE);
+      const n = ty > 0 ? m.elev[i - m.w] : ELEV.PLATEAU;
+      const s = ty < m.h - 1 ? m.elev[i + m.w] : ELEV.PLATEAU;
+      const w = tx > 0 ? m.elev[i - 1] : ELEV.PLATEAU;
+      const e = tx < m.w - 1 ? m.elev[i + 1] : ELEV.PLATEAU;
+      if (n === ELEV.GROUND) {
+        g.fillStyle = 'rgba(255,255,255,0.22)';
+        g.fillRect(px, py, TILE, 1.6);
+      }
+      if (w === ELEV.GROUND) {
+        g.fillStyle = 'rgba(0,0,0,0.3)';
+        g.fillRect(px, py, 2.2, TILE);
+      }
+      if (e === ELEV.GROUND) {
+        g.fillStyle = 'rgba(0,0,0,0.22)';
+        g.fillRect(px + TILE - 2.2, py, 2.2, TILE);
+      }
+      if (s === ELEV.GROUND) {
+        g.drawImage(wallFace(m.realm, 'cliff', v + tx), px, (ty + 1) * TILE - ELEV_H, TILE, ELEV_H);
+        g.fillStyle = 'rgba(255,255,255,0.18)';
+        g.fillRect(px, (ty + 1) * TILE - ELEV_H, TILE, 1.4);
+        g.fillStyle = 'rgba(0,0,0,0.25)';
+        g.fillRect(px, (ty + 1) * TILE, TILE, 3);
+      } else if (s === ELEV.STAIRS) {
+        // carved stone stairs descending south through the face into the stair tile
+        const top = (ty + 1) * TILE - ELEV_H;
+        const bot = (ty + 2) * TILE;
+        const steps = 6;
+        const sh = (bot - top) / steps;
+        for (let k = 0; k < steps; k++) {
+          const yy = top + k * sh;
+          g.fillStyle = k % 2 ? '#a89c88' : '#bcb09a';
+          g.fillRect(px + 1, yy, TILE - 2, sh * 0.62);
+          g.fillStyle = '#6e6454';
+          g.fillRect(px + 1, yy + sh * 0.62, TILE - 2, sh * 0.38);
+        }
+        g.fillStyle = rgba('#000000', 0.25);
+        g.fillRect(px, top, 1.5, bot - top);
+        g.fillRect(px + TILE - 1.5, top, 1.5, bot - top);
+      }
+    }
+  }
+}
 
 const CH = 8;
 const MAX_CHUNKS = 64;
@@ -30,10 +108,11 @@ export function bakedWall(m: GameMap, i: number): boolean {
 function buildChunk(m: GameMap, cx: number, cy: number, scale: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   const px = CH * TILE;
-  c.width = Math.ceil(px * scale);
-  c.height = Math.ceil(px * scale);
+  // integer canvas size with content scaled to fill it exactly (no partially covered edge column)
+  c.width = Math.max(1, Math.round(px * scale));
+  c.height = Math.max(1, Math.round(px * scale));
   const g = c.getContext('2d') as CanvasRenderingContext2D;
-  g.scale(scale, scale);
+  g.scale(c.width / px, c.height / px);
   g.translate(-cx * px, -cy * px);
   const x0 = cx * CH;
   const y0 = cy * CH;
@@ -46,6 +125,8 @@ function buildChunk(m: GameMap, cx: number, cy: number, scale: number): HTMLCanv
       g.drawImage(groundTile(m.realm, gr, Math.floor(hash2(tx, ty, 7) * 4), 0), tx * TILE, ty * TILE, TILE, TILE);
     }
   }
+  bakeRails(g, m, x0, y0);
+  bakeElevation(g, m, x0, y0);
   // deep walls (one extra row below so shifted tops crossing the chunk edge are complete)
   for (let ty = y0; ty < Math.min(m.h, y0 + CH + 1); ty++) {
     for (let tx = x0; tx < Math.min(m.w, x0 + CH); tx++) {
@@ -86,7 +167,8 @@ export function drawGround(ctx: CanvasRenderingContext2D, m: GameMap, x0: number
         cache.chunks.delete(key);
         cache.chunks.set(key, c);
       }
-      ctx.drawImage(c, cx * px, cy * px - 0.01, px, px + 0.02);
+      // a hair of overlap on every side hides anti-aliased seams at fractional zoom levels
+      ctx.drawImage(c, cx * px - 0.3, cy * px - 0.3, px + 0.6, px + 0.6);
     }
   }
   // animated liquids + shorelines

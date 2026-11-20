@@ -1,6 +1,6 @@
 // Deterministic procedural generators for every map in Aetheria.
 import type { HouseSave, InteractAction, NpcRole, ShopKind } from '../types/game';
-import { GameMap, GT, SOL } from './tilemap';
+import { ELEV, GameMap, GT, SOL } from './tilemap';
 import { REALMS } from '../data/realms';
 import { TILE } from '../data/constants';
 import { NPC_NAMES } from '../data/lore';
@@ -109,7 +109,11 @@ function carveLine(m: GameMap, x0: number, y0: number, x1: number, y1: number, r
         if (!m.inBounds(tx, ty) || tx < 2 || ty < 1 || tx >= m.w - 2 || ty >= m.h - 2) continue;
         if ((tx + 0.5 - px) ** 2 + (ty + 0.5 - py) ** 2 > r * r) continue;
         const cur = m.gr(tx, ty);
-        m.set(tx, ty, cur === GT.LIQUID || cur === GT.VOID ? GT.WOOD : g, SOL.FREE);
+        // water crossings become bridges; later overlapping strokes must not pave over them
+        const crossing = cur === GT.LIQUID || cur === GT.VOID;
+        const keep = cur === GT.BRIDGE || cur === GT.WOOD;
+        m.set(tx, ty, crossing ? (m.kind === 'wild' ? GT.BRIDGE : GT.WOOD) : keep ? cur : g, SOL.FREE);
+        if (m.hasElev) m.elev[ty * m.w + tx] = ELEV.GROUND;
       }
     }
   }
@@ -134,6 +138,163 @@ function floodReach(m: GameMap, sx: number, sy: number): Uint8Array {
     }
   }
   return out;
+}
+
+
+// ================================================================== v3 TERRAIN: rivers, plateaus, stairs, pads, props
+
+/** a meandering east-west river with walkable shallows on water banks */
+function carveRiver(m: GameMap, seed: number, liquidSolid: number, water: boolean): number {
+  const baseY = Math.floor(m.h * 0.46);
+  for (let x = 2; x < m.w - 2; x++) {
+    const cy = baseY + Math.sin(x * 0.11 + seed) * 3.2 + (fbm(x * 0.08, 3, seed + 21) - 0.5) * 6;
+    const half = 1.2 + fbm(x * 0.15, 9, seed + 33) * 0.9;
+    for (let y = Math.floor(cy - half - 1); y <= Math.ceil(cy + half + 1); y++) {
+      if (y < 3 || y >= m.h - 3) continue;
+      const d = Math.abs(y + 0.5 - cy);
+      if (m.sol(x, y) === SOL.WALL && d > half) continue;
+      if (d <= half) m.set(x, y, GT.LIQUID, liquidSolid);
+      else if (water && m.gr(x, y) !== GT.LIQUID) m.set(x, y, GT.SHALLOW, SOL.FREE);
+    }
+  }
+  return baseY;
+}
+
+/** raised two-tier plateaus (organic blobs) away from the entrance, dungeon and river */
+function raisePlateaus(m: GameMap, rng: RNG, seed: number, avoid: [number, number, number][]): void {
+  let made = 0;
+  for (let k = 0; k < 12 && made < 4; k++) {
+    const cx = rng.int(10, m.w - 11);
+    const cy = rng.int(9, m.h - 10);
+    const r0 = rng.range(4.5, 7.5);
+    if (avoid.some(([ax, ay, ar]) => Math.hypot(ax - cx, ay - cy) < ar + r0 + 2)) continue;
+    let cells = 0;
+    for (let y = Math.floor(cy - r0 * 1.6); y <= Math.ceil(cy + r0 * 1.6); y++) {
+      for (let x = Math.floor(cx - r0 * 1.6); x <= Math.ceil(cx + r0 * 1.6); x++) {
+        if (x < 4 || y < 4 || x >= m.w - 4 || y >= m.h - 5) continue;
+        const rr = r0 * (0.75 + 0.5 * fbm(x * 0.25, y * 0.25, seed + k * 13));
+        if (Math.hypot(x - cx, (y - cy) * 1.15) > rr) continue;
+        const g = m.gr(x, y);
+        if (m.sol(x, y) !== SOL.FREE || g === GT.LIQUID || g === GT.SAND || g === GT.SHALLOW || g === GT.PATH) continue;
+        m.elev[m.idx(x, y)] = ELEV.PLATEAU;
+        cells++;
+      }
+    }
+    if (cells > 12) made++;
+  }
+  // erode one-tile spurs so faces and rims stay clean
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = 1; y < m.h - 1; y++) {
+      for (let x = 1; x < m.w - 1; x++) {
+        const i = m.idx(x, y);
+        if (m.elev[i] !== ELEV.PLATEAU) continue;
+        const n = (m.elev[i - 1] === 1 ? 1 : 0) + (m.elev[i + 1] === 1 ? 1 : 0) + (m.elev[i - m.w] === 1 ? 1 : 0) + (m.elev[i + m.w] === 1 ? 1 : 0);
+        if (n < 2) m.elev[i] = ELEV.GROUND;
+      }
+    }
+  }
+  m.hasElev = made > 0;
+}
+
+/** every plateau gets stone stairs on its south face (or is flattened) plus an Aether Jump Pad */
+function stairsAndPads(m: GameMap, rng: RNG): void {
+  if (!m.hasElev) return;
+  const seen = new Uint8Array(m.w * m.h);
+  const groundOk = (x: number, y: number) => m.inBounds(x, y) && m.walkable(x, y) && m.elev[m.idx(x, y)] === ELEV.GROUND;
+  for (let i = 0; i < m.w * m.h; i++) {
+    if (m.elev[i] !== ELEV.PLATEAU || seen[i]) continue;
+    const comp: number[] = [];
+    const q = [i];
+    seen[i] = 1;
+    while (q.length) {
+      const cur = q.pop() as number;
+      comp.push(cur);
+      const cx = cur % m.w;
+      const cy = (cur - cx) / m.w;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (!m.inBounds(nx, ny)) continue;
+        const ni = m.idx(nx, ny);
+        if (seen[ni] || m.elev[ni] !== ELEV.PLATEAU) continue;
+        seen[ni] = 1;
+        q.push(ni);
+      }
+    }
+    const edges = comp.filter((c) => {
+      const x = c % m.w;
+      const y = (c - x) / m.w;
+      return m.walkable(x, y) && groundOk(x, y + 1) && groundOk(x, y + 2);
+    });
+    const wide = edges.filter((c) => edges.includes(c + 1));
+    const pickFrom = wide.length ? wide : edges;
+    if (comp.length < 10 || !pickFrom.length) {
+      for (const c of comp) m.elev[c] = ELEV.GROUND;
+      continue;
+    }
+    const s0 = pickFrom[rng.int(0, pickFrom.length - 1)];
+    const sx = s0 % m.w;
+    const sy = (s0 - sx) / m.w;
+    m.elev[m.idx(sx, sy + 1)] = ELEV.STAIRS;
+    if (wide.length) m.elev[m.idx(sx + 1, sy + 1)] = ELEV.STAIRS;
+    // a second staircase on bigger plateaus
+    if (comp.length > 60) {
+      const far = pickFrom.filter((c) => Math.abs((c % m.w) - sx) > 6);
+      if (far.length) {
+        const s1 = far[rng.int(0, far.length - 1)];
+        const x1 = s1 % m.w;
+        const y1 = (s1 - x1) / m.w;
+        m.elev[m.idx(x1, y1 + 1)] = ELEV.STAIRS;
+      }
+    }
+    // Aether Jump Pad from the lowland up onto the plateau
+    const padCands = edges.filter((c) => {
+      const x = c % m.w;
+      const y = (c - x) / m.w;
+      return Math.abs(x - sx) > 2 && m.elev[m.idx(x, y + 1)] === ELEV.GROUND && m.inBounds(x, y - 1) && m.elev[m.idx(x, y - 1)] === ELEV.PLATEAU && m.walkable(x, y - 1);
+    });
+    const padFrom = padCands.length ? padCands : edges.filter((c) => c !== s0 && c !== s0 + 1);
+    if (padFrom.length) {
+      const pc = padFrom[rng.int(0, padFrom.length - 1)];
+      const px = pc % m.w;
+      const py = (pc - px) / m.w;
+      m.pads.push({ x: c(px), y: c(py + 2), tx: c(px), ty: c(py) - 4, lvl: 1, cd: 0 });
+    }
+  }
+}
+
+/** explosive barrels, frost crystals, crates and urns near monster haunts */
+function scatterBreakables(m: GameMap, rng: RNG, cells: [number, number][], count: number, frostBias: number): void {
+  let placed = 0;
+  for (let tries = 0; tries < count * 30 && placed < count; tries++) {
+    const [x, y] = cells[rng.int(0, cells.length - 1)];
+    if (!m.walkable(x, y) || m.gr(x, y) === GT.PATH) continue;
+    if (m.hasElev && m.elev[m.idx(x, y)] === ELEV.STAIRS) continue;
+    if (m.breakSpots.some((b) => Math.hypot(b.x - c(x), b.y - c(y)) < 2.5 * T)) continue;
+    const r = rng.next();
+    const kind = r < 0.3 ? 'barrel' : r < 0.3 + frostBias ? 'frost' : r < 0.75 ? 'crate' : 'urn';
+    const n = kind === 'barrel' && rng.chance(0.5) ? 2 : 1;
+    for (let k = 0; k < n; k++) m.breakSpots.push({ x: c(x) + k * 18, y: c(y) + (k ? 6 : 0), kind });
+    placed++;
+  }
+}
+
+/** shore-side fishing spots (water, lava or sky - every realm has its own catch) */
+function fishingSpots(m: GameMap, rng: RNG): void {
+  const cands: [number, number][] = [];
+  for (let y = 3; y < m.h - 4; y++) {
+    for (let x = 3; x < m.w - 3; x++) {
+      if (m.gr(x, y + 1) !== GT.LIQUID) continue;
+      if (!m.walkable(x, y) || m.gr(x, y) === GT.BRIDGE) continue;
+      if (m.hasElev && m.elev[m.idx(x, y)] !== ELEV.GROUND) continue;
+      cands.push([x, y]);
+    }
+  }
+  for (let k = 0; k < 40 && m.fishSpots.length < 3 && cands.length; k++) {
+    const [x, y] = cands[rng.int(0, cands.length - 1)];
+    if (m.fishSpots.some((f) => Math.hypot(f.x - c(x), f.y - c(y)) < 16 * T)) continue;
+    m.fishSpots.push({ x: c(x), y: c(y) + 6, wx: c(x), wy: c(y + 1) + 4 });
+  }
 }
 
 // ================================================================== CITY
@@ -271,6 +432,13 @@ export function genCity(realm: number): GameMap {
   npc(m, c(25), (H - 2) * T, 'guard', rng);
   npc(m, c(30), (H - 2) * T, 'guard', rng);
   if (realm === 0) npc(m, c(13), c(39), 'arena', rng);
+  // v3: the Stable & Pet Sanctuary and the hooded Black-Market Vendor
+  const stab = m.nearestFree(c(36), c(24), 4);
+  simpleProp(m, 'banner', Math.floor(stab.x / T) + 1, Math.floor(stab.y / T) - 1, 1, 1, { color: '#8a5a32' }, true);
+  m.addInteract(stab.x, stab.y, 'Stable & Pet Sanctuary (mounts and pets)', { t: 'stable' }, 40);
+  const bm = m.nearestFree(c(21), c(24), 4);
+  simpleProp(m, 'stall', Math.floor(bm.x / T) - 1, Math.floor(bm.y / T) - 2, 2, 1, { color: '#2a1030' }, true);
+  m.addInteract(bm.x, bm.y, 'Black-Market Vendor', { t: 'blackmarket' }, 40);
   if (realm === 0 || realm === 4) npc(m, c(50), c(35), 'warden', rng);
   for (let i = 0; i < 6; i++) npc(m, c(rng.int(23, 33)), c(rng.int(15, 27)), 'villager', rng, { wander: 90 });
   let ci = 0;
@@ -315,6 +483,10 @@ export function genWild(realm: number): GameMap {
       if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) m.set(x, y, GT.GRASS, SOL.WALL);
     }
   }
+  // v3: a river with walkable shallows, then raised plateaus (paths below cut canyons through them)
+  const riverY = carveRiver(m, seed, liquidSolid, P.liquid === 'water');
+  raisePlateaus(m, rng, seed, [[48, 4, 10], [48, 64, 12], [48, riverY, 0]]);
+  for (let x = 0; x < W; x++) for (let y = riverY - 4; y <= riverY + 4; y++) if (m.inBounds(x, y)) m.elev[m.idx(x, y)] = ELEV.GROUND;
   // north entrance from the city
   fillRect(m, 44, 0, 8, 4, GT.PATH, SOL.FREE);
   m.exits.push({ x: 44 * T, y: 0, w: 8 * T, h: 12, to: `city:${realm}`, entry: 'south', label: R.city });
@@ -333,7 +505,10 @@ export function genWild(realm: number): GameMap {
     carveLine(m, a[0], a[1], rng.int(8, 88), rng.int(10, 64), 1.2, GT.DIRT);
   }
   // dungeon entrance clearing
-  for (let y = 56; y < 69; y++) for (let x = dx - 5; x <= dx + 5; x++) if (x > 2 && x < W - 3) m.set(x, y, (x + y) % 5 === 0 ? GT.DIRT : GT.GRASS, SOL.FREE);
+  for (let y = 56; y < 69; y++) for (let x = dx - 5; x <= dx + 5; x++) if (x > 2 && x < W - 3) {
+    m.set(x, y, (x + y) % 5 === 0 ? GT.DIRT : GT.GRASS, SOL.FREE);
+    m.elev[m.idx(x, y)] = ELEV.GROUND;
+  }
   fillRect(m, dx - 1, 63, 3, 5, GT.PATH, SOL.FREE);
   solidRect(m, dx - 2, 60, 5, 3);
   m.addProp({ kind: 'dungeon', x: (dx + 0.5) * T, y: 63 * T, sprite: `dungeon:${realm}`, ax: 92, ay: 186, sw: 184, sh: 190, sortOff: 0, light: { r: 120, color: realm === 2 ? '#ff7a3d' : '#7fb4ff', oy: -30 } });
@@ -363,6 +538,7 @@ export function genWild(realm: number): GameMap {
     }
   }
 
+  stairsAndPads(m, rng);
   const reach = floodReach(m, 48, 4);
   const cells: [number, number][] = [];
   for (let y = 4; y < H - 3; y++) for (let x = 3; x < W - 3; x++) if (reach[m.idx(x, y)] && m.gr(x, y) !== GT.PATH && m.gr(x, y) !== GT.WOOD) cells.push([x, y]);
@@ -411,6 +587,8 @@ export function genWild(realm: number): GameMap {
     }
   }
   m.eliteSpot = { x: c(best[0]), y: c(best[1]) };
+  scatterBreakables(m, rng, cells.filter(([x, y]) => zones.some(([zx, zy]) => Math.hypot(zx - x, zy - y) < 6)), 16, realm === 3 ? 0.3 : 0.12);
+  fishingSpots(m, rng);
   m.computeWallDepth();
   return m;
 }
@@ -538,6 +716,9 @@ export function genDungeon(realm: number, seed: number, abyssFloor = 0): GameMap
   }
   m.bossRoom = { x: bossRoom.x, y: bossRoom.y, w: bossRoom.w, h: bossRoom.h, boss: bossId, level, doorCells, started: false, defeated: false };
   m.rooms = [...rooms, bossRoom];
+  const roomCells: [number, number][] = [];
+  for (const r of rooms.slice(1)) for (let y = r.y + 1; y < r.y + r.h - 1; y++) for (let x = r.x + 1; x < r.x + r.w - 1; x++) if (m.walkable(x, y)) roomCells.push([x, y]);
+  if (roomCells.length) scatterBreakables(m, rng, roomCells, Math.min(14, 3 + rooms.length), realm === 3 ? 0.3 : 0.15);
 
   // entrance stairs
   const ex = entrance.x + Math.floor(entrance.w / 2);

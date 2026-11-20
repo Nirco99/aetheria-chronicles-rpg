@@ -1,8 +1,8 @@
 // Base class for every living thing in the world. Kept dependency-free (types, util and
 // constants only) so subclasses can extend it without module initialisation cycles.
-import type { Anim, BuffInst, BuffSpec, Dir, StatusApply, StatusInst, StatusKind, Stats, Team } from '../types/game';
+import type { Anim, BuffInst, BuffSpec, Dir, GaugeKind, StatusApply, StatusInst, StatusKind, Stats, Team } from '../types/game';
 
-export type ActorKind = 'player' | 'companion' | 'monster' | 'npc';
+export type ActorKind = 'player' | 'companion' | 'monster' | 'npc' | 'prop' | 'shadow' | 'caravan';
 let NEXT_ID = 1;
 
 export function newAnim(): Anim {
@@ -10,7 +10,7 @@ export function newAnim(): Anim {
 }
 
 export function emptyStats(): Stats {
-  return { maxHp: 100, maxMp: 50, maxSta: 100, atk: 10, def: 5, mag: 5, crit: 0.05, critDmg: 1.5, aspd: 1, move: 1, brk: 0, block: 0, mpRegen: 1, xpMult: 1, elem: {} };
+  return { maxHp: 100, maxMp: 50, maxSta: 100, atk: 10, def: 5, mag: 5, crit: 0.05, critDmg: 1.5, aspd: 1, move: 1, brk: 0, block: 0, mpRegen: 1, xpMult: 1, elem: {}, lifesteal: 0, skillDmg: 0, cdr: 0, magicFind: 0 };
 }
 
 const DEFAULT_POWER: Record<StatusKind, number> = { burn: 1, poison: 0.8, chill: 0.4, freeze: 1, stun: 1, root: 1, shred: 0.25, shock: 1 };
@@ -61,6 +61,19 @@ export abstract class Actor {
   moving = false;
   counter: CounterStance | null = null;
   anim: Anim = newAnim();
+  // ---- v3 Full-Dive physics & elements
+  /** elemental reaction gauges (seconds remaining) */
+  gauges: Partial<Record<GaugeKind, number>> = {};
+  /** damage of the last hit taken (Wall-Slam impact scales from it) */
+  lastDmg = 0;
+  lastHitBy: Actor | null = null;
+  slamCd = 0;
+  /** seconds since the last knockback impulse (Wall-Slam eligibility) */
+  kbFresh = 0;
+  /** elevation tier the actor stands on (0 ground, 1 plateau) */
+  lvl = 0;
+  /** blade-trail samples (hilt / tip) for the 12-sample trail mesh */
+  trail: { hx: number; hy: number; tx: number; ty: number; t: number }[] = [];
 
   abstract get displayName(): string;
 
@@ -158,6 +171,14 @@ export abstract class Actor {
       this.counter.t -= dt;
       if (this.counter.t <= 0) this.counter = null;
     }
+    for (const k in this.gauges) {
+      const g = k as GaugeKind;
+      const v = (this.gauges[g] ?? 0) - dt;
+      if (v <= 0) delete this.gauges[g];
+      else this.gauges[g] = v;
+    }
+    if (this.slamCd > 0) this.slamCd -= dt;
+    if (this.kbFresh > 0) this.kbFresh -= dt;
     this.anim.t += dt;
     if (this.anim.glint > 0) this.anim.glint -= dt;
     for (let i = this.anim.ghosts.length - 1; i >= 0; i--) {

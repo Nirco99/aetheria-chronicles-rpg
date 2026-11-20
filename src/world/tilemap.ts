@@ -8,7 +8,14 @@ import { TILE } from '../data/constants';
 export const GT = {
   VOID: 0, GRASS: 1, GRASS2: 2, FLOWERS: 3, DIRT: 4, PATH: 5, PLAZA: 6, WOOD: 7, SAND: 8,
   LIQUID: 9, FLOOR: 10, FLOOR2: 11, CARPET: 12, WOODFLOOR: 13, ICE: 14, MARBLE: 15,
+  /** v3: walkable shallow water (ripples, slows) and wooden suspension bridges */
+  SHALLOW: 16, BRIDGE: 17,
 } as const;
+
+/** v3 elevation: 0 ground, 1 plateau, 2 carved stone stairs (walkable from both tiers) */
+export const ELEV = { GROUND: 0, PLATEAU: 1, STAIRS: 2 } as const;
+/** on-screen height of a plateau tier (oblique rock face) */
+export const ELEV_H = 22;
 
 export const SOL = { FREE: 0, WALL: 1, LIQUID: 2, PROP: 3, VOID: 4 } as const;
 
@@ -19,6 +26,8 @@ export interface Box {
   y: number;
   hw: number;
   hh: number;
+  /** elevation tier the mover stands on (actors only) */
+  lvl?: number;
 }
 
 const NUDGE = 4;
@@ -45,6 +54,12 @@ export class GameMap {
   rooms: { x: number; y: number; w: number; h: number }[] = [];
   chests: { x: number; y: number; rarity: number; opened: boolean }[] = [];
   eliteSpot: { x: number; y: number } | null = null;
+  // ---- v3 terrain & interactive features
+  readonly elev: Uint8Array;
+  hasElev = false;
+  breakSpots: { x: number; y: number; kind: 'barrel' | 'frost' | 'crate' | 'urn' }[] = [];
+  pads: { x: number; y: number; tx: number; ty: number; lvl: number; cd: number }[] = [];
+  fishSpots: { x: number; y: number; wx: number; wy: number }[] = [];
   private nextId = 1;
 
   constructor(
@@ -59,6 +74,35 @@ export class GameMap {
     this.ground = new Uint8Array(w * h);
     this.solid = new Uint8Array(w * h);
     this.wdepth = new Uint8Array(w * h);
+    this.elev = new Uint8Array(w * h);
+  }
+
+  /** elevation code of the tile under a world point */
+  elevAt(x: number, y: number): number {
+    if (!this.hasElev) return 0;
+    const tx = Math.floor(x / TILE);
+    const ty = Math.floor(y / TILE);
+    if (!this.inBounds(tx, ty)) return 0;
+    return this.elev[ty * this.w + tx];
+  }
+
+  /** visual lift of a world point (0..1 tiers); stairs blend between tiers */
+  liftAt(x: number, y: number): number {
+    if (!this.hasElev) return 0;
+    const e = this.elevAt(x, y);
+    if (e === ELEV.PLATEAU) return 1;
+    if (e === ELEV.STAIRS) {
+      const fy = y / TILE - Math.floor(y / TILE);
+      return Math.max(0, Math.min(1, 1 - fy));
+    }
+    return 0;
+  }
+
+  /** snap a mover's tier to the ground it stands on (stairs keep the current tier) */
+  settle(b: Box): void {
+    if (!this.hasElev || b.lvl === undefined) return;
+    const e = this.elevAt(b.x, b.y);
+    if (e !== ELEV.STAIRS) b.lvl = e;
   }
 
   get pw(): number {
@@ -111,17 +155,23 @@ export class GameMap {
   }
 
   /** true when the box does not overlap any blocking tile */
-  boxFree(x: number, y: number, hw: number, hh: number, flying = false): boolean {
+  boxFree(x: number, y: number, hw: number, hh: number, flying = false, lvl = -1): boolean {
     const x0 = Math.floor((x - hw) / TILE);
     const x1 = Math.floor((x + hw - 0.001) / TILE);
     const y0 = Math.floor((y - hh) / TILE);
     const y1 = Math.floor((y + hh - 0.001) / TILE);
+    const checkElev = lvl >= 0 && this.hasElev && !flying;
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
         if (tx < 0 || ty < 0 || tx >= this.w || ty >= this.h) return false;
-        const s = this.solid[ty * this.w + tx];
+        const i = ty * this.w + tx;
+        const s = this.solid[i];
         if (s === SOL.WALL || s === SOL.PROP) return false;
         if (!flying && s !== SOL.FREE) return false;
+        if (checkElev) {
+          const e = this.elev[i];
+          if (e !== ELEV.STAIRS && e !== lvl) return false;
+        }
       }
     }
     return true;
@@ -132,21 +182,33 @@ export class GameMap {
    * with up to NUDGE px of offset on the other axis, slide toward the opening (corner chamfer).
    */
   move(b: Box, dx: number, dy: number, flying = false): { hitX: boolean; hitY: boolean } {
+    if (this.hasElev && b.lvl !== undefined && !flying) {
+      this.settle(b);
+      const onStairs = this.elevAt(b.x, b.y) === ELEV.STAIRS;
+      const res = this.moveLvl(b, dx, dy, flying, onStairs ? -1 : (b.lvl ?? 0));
+      this.settle(b);
+      return res;
+    }
+    return this.moveLvl(b, dx, dy, flying, -1);
+  }
+
+  private moveLvl(b: Box, dx: number, dy: number, flying: boolean, lvl: number): { hitX: boolean; hitY: boolean } {
+    const free = (x: number, y: number) => this.boxFree(x, y, b.hw, b.hh, flying, lvl);
     let hitX = false;
     let hitY = false;
     if (dx !== 0) {
       const nx = b.x + dx;
-      if (this.boxFree(nx, b.y, b.hw, b.hh, flying)) b.x = nx;
+      if (free(nx, b.y)) b.x = nx;
       else {
         let nudged = false;
         if (dy === 0) {
           for (let n = 1; n <= NUDGE && !nudged; n++) {
             for (const s of [-1, 1]) {
-              if (this.boxFree(nx, b.y + s * n, b.hw, b.hh, flying)) {
+              if (free(nx, b.y + s * n)) {
                 const step = Math.min(n, Math.abs(dx));
-                if (this.boxFree(b.x, b.y + s * step, b.hw, b.hh, flying)) {
+                if (free(b.x, b.y + s * step)) {
                   b.y += s * step;
-                  if (this.boxFree(nx, b.y, b.hw, b.hh, flying)) b.x = nx;
+                  if (free(nx, b.y)) b.x = nx;
                   nudged = true;
                   break;
                 }
@@ -159,7 +221,7 @@ export class GameMap {
           let rem = Math.abs(dx);
           while (rem > 0) {
             const st = Math.min(0.5, rem);
-            if (this.boxFree(b.x + sx * st, b.y, b.hw, b.hh, flying)) {
+            if (free(b.x + sx * st, b.y)) {
               b.x += sx * st;
               rem -= st;
             } else break;
@@ -170,17 +232,17 @@ export class GameMap {
     }
     if (dy !== 0) {
       const ny = b.y + dy;
-      if (this.boxFree(b.x, ny, b.hw, b.hh, flying)) b.y = ny;
+      if (free(b.x, ny)) b.y = ny;
       else {
         let nudged = false;
         if (dx === 0) {
           for (let n = 1; n <= NUDGE && !nudged; n++) {
             for (const s of [-1, 1]) {
-              if (this.boxFree(b.x + s * n, ny, b.hw, b.hh, flying)) {
+              if (free(b.x + s * n, ny)) {
                 const step = Math.min(n, Math.abs(dy));
-                if (this.boxFree(b.x + s * step, b.y, b.hw, b.hh, flying)) {
+                if (free(b.x + s * step, b.y)) {
                   b.x += s * step;
-                  if (this.boxFree(b.x, ny, b.hw, b.hh, flying)) b.y = ny;
+                  if (free(b.x, ny)) b.y = ny;
                   nudged = true;
                   break;
                 }
@@ -193,7 +255,7 @@ export class GameMap {
           let rem = Math.abs(dy);
           while (rem > 0) {
             const st = Math.min(0.5, rem);
-            if (this.boxFree(b.x, b.y + sy * st, b.hw, b.hh, flying)) {
+            if (free(b.x, b.y + sy * st)) {
               b.y += sy * st;
               rem -= st;
             } else break;
@@ -256,6 +318,11 @@ export class GameMap {
         if (nx < 0 || ny < 0 || nx >= this.w || ny >= this.h) continue;
         const ni = ny * this.w + nx;
         if (out[ni] !== -1 || this.solid[ni] !== SOL.FREE) continue;
+        if (this.hasElev) {
+          const e0 = this.elev[cur];
+          const e1 = this.elev[ni];
+          if (e0 !== e1 && e0 !== ELEV.STAIRS && e1 !== ELEV.STAIRS) continue;
+        }
         out[ni] = cd + 1;
         q[qt++] = ni;
       }

@@ -309,6 +309,52 @@ boss({
   drops: [{ id: 'enh_greater', chance: 1, min: 3, max: 4 }, { id: 'automaton_gear', chance: 1, min: 4, max: 6 }],
 });
 
+// ================================================================== v3: ROAMING RAID BOSSES & WORLD EVENTS
+boss({
+  id: 'r_colossus', name: 'Colossus of the Sundered Gate', title: 'Roaming Raid Boss', draw: 'golem', realm: 0, hp: 44, atk: 1.9, def: 2.3, speed: 0.75, size: 32, poise: 20, xp: 45, aggro: 999, boss: true,
+  colors: ['#4a4f5e', '#22252e', '#7fe9ff'],
+  intro: 'Gate-stone grinds against gate-stone. The Colossus turns its hollow eyes toward you.',
+  trophy: 'relic_shard',
+  attacks: [
+    atk({ id: 'col_fist', name: 'Gate Fist', range: 100, cd: 2, windup: 0.6, r: 120, arc: 1.6, mult: 1.6, kb: 240 }),
+    atk({ id: 'col_slam', name: 'Sundering Slam', range: 130, cd: 4, windup: 1, shape: 'circle', at: 'self', r: 150, mult: 2, kb: 300 }),
+    atk({ id: 'col_boulders', name: 'Boulder Rain', range: 999, cd: 6, windup: 1.2, shape: 'circle', at: 'target', r: 80, mult: 1.8, special: 'meteors' }),
+    atk({ id: 'col_quake', name: 'Quake Rings', range: 400, cd: 6.5, windup: 0.9, shape: 'ring', r: 170, inner: 100, mult: 1.6, special: 'waves' }),
+    atk({ id: 'col_charge', name: 'Gatebreaker Charge', range: 320, cd: 5, windup: 0.9, shape: 'line', len: 330, w: 70, dash: 300, mult: 2, kb: 320 }),
+  ],
+  phases: [
+    { at: 1, name: 'Waking Titan', attacks: ['col_fist', 'col_slam', 'col_charge'] },
+    { at: 0.6, name: 'Gate Fury', attacks: ['col_fist', 'col_slam', 'col_boulders', 'col_charge'], enter: 'enrage' },
+    { at: 0.3, name: 'Sundered', attacks: ['col_fist', 'col_slam', 'col_boulders', 'col_quake', 'col_charge'], speed: 1.3, enter: 'enrage' },
+  ],
+  drops: [{ id: 'enh_greater', chance: 1, min: 2, max: 3 }, { id: 'relic_shard', chance: 1, min: 1, max: 2 }, { id: 'treasure_map', chance: 0.6 }],
+});
+boss({
+  id: 'r_reaper', name: 'The Hollow Reaper', title: 'Roaming Raid Boss', draw: 'wraith', realm: 0, hp: 38, atk: 2.1, def: 1.7, speed: 1.3, size: 30, poise: 16, xp: 45, aggro: 999, boss: true, element: 'void',
+  colors: ['#1a1030', '#cfc6b0', '#ff4f7b'],
+  intro: 'Bone scythes unfold in the dark. The Hollow Reaper has come to harvest.',
+  trophy: 'relic_shard',
+  attacks: [
+    atk({ id: 'rep_sweep', name: 'Scythe Sweep', range: 120, cd: 1.8, windup: 0.55, r: 150, arc: 2.6, mult: 1.7, element: 'void' }),
+    atk({ id: 'rep_lines', name: 'Reaping Lines', range: 420, cd: 4.5, windup: 0.9, shape: 'line', len: 420, w: 40, mult: 1.8, count: 3, spread: 0.6, element: 'void' }),
+    atk({ id: 'rep_blink', name: 'Shadow Phase', range: 999, cd: 5, windup: 0.3, shape: 'none', mult: 0, special: 'blink' }),
+    atk({ id: 'rep_vortex', name: 'Grasping Void', range: 999, cd: 9, windup: 0.8, shape: 'circle', at: 'target', r: 150, mult: 0.6, element: 'void', special: 'vortex' }),
+    atk({ id: 'rep_cross', name: 'Harvest Cross', range: 999, cd: 6, windup: 1.1, shape: 'line', len: 440, w: 44, mult: 2.1, element: 'void', special: 'cross' }),
+  ],
+  phases: [
+    { at: 1, name: 'The Harvest', attacks: ['rep_sweep', 'rep_lines', 'rep_blink'] },
+    { at: 0.6, name: 'Hollow Night', attacks: ['rep_sweep', 'rep_lines', 'rep_blink', 'rep_vortex'], enter: 'enrage' },
+    { at: 0.3, name: 'Final Reaping', attacks: ['rep_sweep', 'rep_lines', 'rep_blink', 'rep_vortex', 'rep_cross'], speed: 1.35, enter: 'enrage' },
+  ],
+  drops: [{ id: 'enh_greater', chance: 1, min: 2, max: 3 }, { id: 'mythic_core', chance: 0.25 }, { id: 'treasure_map', chance: 0.6 }],
+});
+mon({
+  id: 'ev_gate', name: 'Corrupted Gate', draw: 'wisp', realm: 0, hp: 7, atk: 1.1, def: 1.6, speed: 0, size: 26, poise: 6, xp: 3, aggro: 320,
+  colors: ['#3a0f4a', '#a970ff', '#ff4f7b'],
+  attacks: [atk({ id: 'gate_pulse', name: 'Corruption Pulse', range: 110, cd: 4.5, windup: 1, shape: 'circle', at: 'self', r: 110, mult: 1.2, element: 'void', kb: 200 })],
+  drops: [{ id: 'relic_shard', chance: 0.35 }, { id: 'enh_stone', chance: 1, min: 2, max: 3 }],
+});
+
 export const MONSTERS = M;
 export const BOSSES = B;
 export const BOSS_IDS = ['b_kobold', 'b_treant', 'b_wyrm', 'b_empress', 'b_paragon'];

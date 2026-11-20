@@ -300,6 +300,23 @@ export class AudioEngine {
 
   // ---------------------------------------------------------------- music
 
+  /** harmonic drop chord for rare loot: richer and brighter with every rarity step */
+  chord(rarity: number): void {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    if (now - (this.last.get('chord') ?? -1) < 0.25) return;
+    this.last.set('chord', now);
+    const roots = [0, 0, 523.25, 587.33, 659.25, 783.99];
+    const base = roots[Math.min(5, rarity)] || 523.25;
+    const steps = rarity >= 5 ? [0, 4, 7, 11, 14, 19] : rarity >= 4 ? [0, 4, 7, 12, 16] : rarity >= 3 ? [0, 4, 7, 12] : [0, 7, 12];
+    steps.forEach((st, i) => {
+      const f = base * Math.pow(2, st / 12);
+      this.tone(f, 1.1 + rarity * 0.15, 'triangle', 0.07, { delay: i * 0.055, attack: 0.01 });
+      this.tone(f * 2, 0.6, 'sine', 0.025, { delay: i * 0.055 + 0.02 });
+    });
+    if (rarity >= 4) this.tone(base * 4, 1.6, 'sine', 0.03, { delay: 0.3, attack: 0.2 });
+  }
+
   setMusic(kind: string, realmRoot = 62, minor = false): void {
     const key = `${kind}:${realmRoot}:${minor}`;
     if (key === this.trackKey) return;

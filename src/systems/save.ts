@@ -1,13 +1,15 @@
-// Save slots (localStorage, which Electron persists in its user-data folder), new-game
-// creation with starter kits, migration of older saves, and settings persistence.
+// Save slots, the account-wide shared vault, settings and migration of older saves.
+// On the desktop build every key is a JSON file in ./saves (see platform/desktop.ts):
+// slot_1..3.json, global_vault.json, settings.json, leaderboard.json, last_slot.json.
 import type { Appearance, Branch, EquipSlot, GearItem, SaveData, Settings, SlotSummary, WorldMode } from '../types/game';
 import { G, DEFAULT_SETTINGS } from '../core/state';
 import { BRANCHES } from '../data/constants';
 import { starterKit } from '../data/items';
 import { REALMS } from '../data/realms';
 import { newEconomy } from './economy';
+import { store } from '../platform/desktop';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 3;
 export const SLOT_COUNT = 3;
 export type StarterKit = 'sword_shield' | 'dual' | 'spear' | 'bow' | 'staff';
 
@@ -85,7 +87,11 @@ export function newSave(slot: number, name: string, appearance: Appearance, mode
     hotbar: [kd.skill, null, null, null, null, null],
     quick: ['pot_hp_s', 'pot_mp_s', 'food_cutlet'],
     awakenings: [],
-    counters: { perfectParries: 0, masterworks: 0, dmgBlocked: 0, kills: 0, bossKills: 0, deaths: 0, forged: 0, lowHpBossWins: 0, gathered: 0, crafted: 0 },
+    counters: {
+      perfectParries: 0, masterworks: 0, dmgBlocked: 0, kills: 0, bossKills: 0, deaths: 0, forged: 0, lowHpBossWins: 0, gathered: 0, crafted: 0,
+      skillConnects: 0, maxChain: 0, novas: 0, wallSlams: 0, reactions: 0, ripostes: 0, sssReached: 0, breakables: 0, fishCaught: 0, treasures: 0,
+      eventsWon: 0, caravans: 0, duelsWon: 0, assists: 0, trades: 0, raidsWon: 0, tripleSwitches: 0, chargeSlams: 0, extracted: 0, uniquesFound: 0,
+    },
     guilds: { aegis: 0, anvil: 0, wing: 0, arcanum: 0 },
     joined: [],
     bounties: [],
@@ -107,6 +113,32 @@ export function newSave(slot: number, name: string, appearance: Appearance, mode
     abyss: { best: 0, checkpoint: 0 },
     elitesSlain: [],
     tutorialSeen: false,
+    skillRanks: { [kd.skill]: 1 },
+    morphs: {},
+    keystones: [],
+    bridges: [],
+    codex: [],
+    relics: { weapon: null, armor: null, utility: null },
+    wardrobe: [],
+    transmog: {},
+    dyes: { main: null, accent: null },
+    autoSalvage: false,
+    party: [],
+    gambit: 'assault',
+    affinity: {},
+    mounts: [],
+    mount: null,
+    pets: [],
+    pet: null,
+    achievements: [],
+    title: null,
+    bestiary: {},
+    reactionsSeen: [],
+    hunts: [],
+    blackMarket: false,
+    fish: {},
+    raidBosses: [],
+    adventurerRep: {},
   };
 }
 
@@ -121,7 +153,37 @@ function migrate(d: SaveData): SaveData {
   out.vault = d.vault ?? fresh.vault;
   out.economy = d.economy?.idx?.length === 5 ? d.economy : fresh.economy;
   if (!Array.isArray(out.hotbar) || out.hotbar.length < 6) out.hotbar = [...(out.hotbar ?? []), null, null, null, null, null, null].slice(0, 6);
+  // v3: every learned skill starts at rank 1, the single active companion joins the party
+  out.skillRanks = { ...(d.skillRanks ?? {}) };
+  for (const id of out.learned) if (!out.skillRanks[id]) out.skillRanks[id] = 1;
+  out.relics = { ...fresh.relics, ...(d.relics ?? {}) };
+  out.dyes = { ...fresh.dyes, ...(d.dyes ?? {}) };
+  if (!Array.isArray(d.party)) out.party = d.activeCompanion && d.companions?.[d.activeCompanion]?.recruited ? [d.activeCompanion] : [];
+  out.party = out.party.filter((id) => out.companions[id]?.recruited).slice(0, 2);
+  out.version = SAVE_VERSION;
   return out;
+}
+
+// ------------------------------------------------------------------ account-wide shared vault
+
+const VAULT_KEY = 'aetheria.vault';
+
+/** the 100-slot vault is shared by every character on this PC (global_vault.json) */
+function loadSharedVault(fallback: SaveData['vault']): SaveData['vault'] {
+  try {
+    const raw = store.get(VAULT_KEY);
+    if (raw) {
+      const v = JSON.parse(raw) as SaveData['vault'];
+      return { gear: Array.isArray(v.gear) ? v.gear : [], items: v.items ?? {} };
+    }
+  } catch {
+    /* corrupt vault file: fall back to the character's own copy */
+  }
+  return fallback;
+}
+
+function saveSharedVault(v: SaveData['vault']): void {
+  store.set(VAULT_KEY, JSON.stringify(v));
 }
 
 export function saveGame(): boolean {
@@ -140,18 +202,20 @@ export function saveGame(): boolean {
   }
   s.hp = p.hp;
   s.mp = p.mp;
+  if (s.slot < 0) return false;
   try {
-    localStorage.setItem(key(s.slot), JSON.stringify(s));
-    localStorage.setItem('aetheria.lastSlot', String(s.slot));
-    return true;
+    saveSharedVault(s.vault);
+    const ok = store.set(key(s.slot), JSON.stringify({ ...s, vault: { gear: [], items: {} } }));
+    store.set('aetheria.lastSlot', String(s.slot));
+    return ok;
   } catch {
     return false;
   }
 }
 
-export function loadGame(slot: number): SaveData | null {
+function readSlot(slot: number): SaveData | null {
   try {
-    const raw = localStorage.getItem(key(slot));
+    const raw = store.get(key(slot));
     if (!raw) return null;
     return migrate(JSON.parse(raw) as SaveData);
   } catch {
@@ -159,8 +223,14 @@ export function loadGame(slot: number): SaveData | null {
   }
 }
 
+export function loadGame(slot: number): SaveData | null {
+  const d = readSlot(slot);
+  if (d) d.vault = loadSharedVault(d.vault);
+  return d;
+}
+
 export function slotSummary(slot: number): SlotSummary | null {
-  const d = loadGame(slot);
+  const d = readSlot(slot);
   if (!d) return null;
   const [kind, arg] = d.map.split(':');
   const r = REALMS[Number(arg) || 0];
@@ -170,26 +240,22 @@ export function slotSummary(slot: number): SlotSummary | null {
 
 export function lastSlot(): number | null {
   try {
-    const v = localStorage.getItem('aetheria.lastSlot');
+    const v = store.get('aetheria.lastSlot');
     if (v === null) return null;
     const n = Number(v);
-    return loadGame(n) ? n : null;
+    return readSlot(n) ? n : null;
   } catch {
     return null;
   }
 }
 
 export function deleteSlot(slot: number): void {
-  try {
-    localStorage.removeItem(key(slot));
-  } catch {
-    /* ignore */
-  }
+  store.remove(key(slot));
 }
 
 export function loadSettings(): Settings {
   try {
-    const raw = localStorage.getItem('aetheria.settings');
+    const raw = store.get('aetheria.settings');
     return raw ? { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) } : { ...DEFAULT_SETTINGS };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -197,9 +263,5 @@ export function loadSettings(): Settings {
 }
 
 export function saveSettings(s: Settings): void {
-  try {
-    localStorage.setItem('aetheria.settings', JSON.stringify(s));
-  } catch {
-    /* ignore */
-  }
+  store.set('aetheria.settings', JSON.stringify(s));
 }

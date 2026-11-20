@@ -13,6 +13,9 @@ import { buildCompanionLook, type Look } from '../render/paperdoll';
 import { fx } from '../render/fx';
 import { audio } from '../engine/audio';
 import { angTo, clamp, dirFromAngle, dist, rnd } from '../engine/util';
+import { affinityRank } from '../data/v3';
+
+export type CompanionRole = 'party' | 'vanguard' | 'adventurer';
 
 const SKILL_LEVELS = [1, 6, 12, 20, 30];
 
@@ -41,11 +44,15 @@ export class Companion extends Actor {
   chainTarget: Actor | null = null;
   chainHits = 0;
   tint: string | null = null;
+  role: CompanionRole = 'party';
+  /** chain partner queued for a Triple SWITCH! */
+  nextChain: { c: Companion; target: Actor } | null = null;
 
-  constructor(def: CompanionDef, save: CompanionSave) {
+  constructor(def: CompanionDef, save: CompanionSave, role: CompanionRole = 'party') {
     super();
     this.def = def;
     this.save = save;
+    this.role = role;
     this.team = 'player';
     this.hw = 6;
     this.hh = 4;
@@ -67,14 +74,15 @@ export class Companion extends Actor {
   }
 
   refresh(): void {
-    this.stats = companionStats(this.level, this.save, this.buffs);
+    const aff = this.role === 'party' ? affinityRank(G.save.affinity[this.def.id] ?? 0) : this.role === 'vanguard' ? 2 : 0;
+    this.stats = companionStats(this.level, this.save, this.buffs, aff);
     this.look = buildCompanionLook(this.def, this.save);
     this.mode = weaponMode(this.save.equip.main, this.save.equip.off);
     this.tint = gemColor(this.save.equip.main);
     this.hp = clamp(this.hp, 0, this.stats.maxHp);
   }
 
-  private color(): string {
+  protected color(): string {
     return this.tint ?? this.def.colors.glow;
   }
 
@@ -91,7 +99,7 @@ export class Companion extends Actor {
     G.ui.toast(`${this.def.name} was knocked out! Returning in 15s.`, 'warn');
   }
 
-  private revive(): void {
+  protected revive(): void {
     const p = G.player;
     const pos = G.world.map.nearestFree(p.x - 30, p.y + 10, 4);
     this.x = pos.x;
@@ -128,7 +136,7 @@ export class Companion extends Actor {
     fx.glint(this.x, this.y - 26, this.color(), 24);
   }
 
-  private updateChain(dt: number): void {
+  protected updateChain(dt: number): void {
     this.chainT += dt;
     const t = this.chainTarget;
     const times = [0.1, 0.22, 0.34, 0.46, 0.66];
@@ -153,10 +161,13 @@ export class Companion extends Actor {
     if (this.chainT >= 0.85 || !t || t.dead) {
       this.st = 'follow';
       this.chainTarget = null;
+      const nx = this.nextChain;
+      this.nextChain = null;
+      if (nx && !nx.c.dead && !nx.target.dead) G.world.continueTripleSwitch(nx.c, nx.target);
     }
   }
 
-  private inDanger(): { x: number; y: number } | null {
+  protected inDanger(): { x: number; y: number } | null {
     for (const tl of G.world.teles) {
       const owner = G.world.monsterById(tl.owner);
       if (!owner || tl.beam) continue;
@@ -166,14 +177,29 @@ export class Companion extends Actor {
     return null;
   }
 
-  private pickTarget(): void {
+  /** party companions obey the Tactical Gambit Bar (F1-F4) */
+  protected gambit(): 'assault' | 'guard' | 'focus' | 'support' {
+    return this.role === 'party' ? G.save.gambit : 'assault';
+  }
+
+  protected pickTarget(): void {
     const p = G.player;
+    if (G.world.duel) {
+      this.target = null;
+      return;
+    }
+    const g = this.gambit();
+    if (g === 'focus' && p.focus && !p.focus.dead && p.focus.kind === 'monster' && dist(p.x, p.y, p.focus.x, p.focus.y) < 460) {
+      this.target = p.focus;
+      return;
+    }
     let best: Actor | null = null;
-    let bd = 340;
+    let bd = g === 'guard' ? 300 : 340;
     for (const m of G.world.monsters) {
       if (m.dead || m.spawnT > 0) continue;
       const d = dist(p.x, p.y, m.x, m.y);
-      const pref = m.target === p ? d - 40 : d;
+      if (g === 'guard' && m.target !== p && d > 150) continue;
+      const pref = m.target === p ? d - (g === 'guard' ? 220 : 40) : d;
       if (pref < bd) {
         bd = pref;
         best = m;
@@ -182,7 +208,7 @@ export class Companion extends Actor {
     this.target = best;
   }
 
-  private tryCast(): boolean {
+  protected tryCast(): boolean {
     const branches = setBranches(this.save.equip.main, this.save.equip.off);
     const p = G.player;
     const t = this.target;
@@ -194,12 +220,16 @@ export class Companion extends Actor {
     }
     if (!options.length) return false;
     let pick: ActiveSkillDef | undefined;
-    if (p.hp < p.stats.maxHp * 0.5) pick = options.find((s) => s.ai === 'support');
-    if (!pick && this.hp < this.stats.maxHp * 0.4) pick = options.find((s) => s.ai === 'defense');
+    const g = this.gambit();
+    const healAt = g === 'support' ? 0.75 : 0.5;
+    if (p.hp < p.stats.maxHp * healAt) pick = options.find((s) => s.ai === 'support');
+    if (!pick && g === 'support' && Math.random() < 0.3) pick = options.find((s) => s.ai === 'support' || s.ai === 'defense');
+    if (!pick && (this.hp < this.stats.maxHp * 0.4 || (g === 'guard' && t && (t as { target?: Actor | null }).target === p))) pick = options.find((s) => s.ai === 'defense');
     if (!pick && t) {
       const d = dist(this.x, this.y, t.x, t.y);
       const fit = options.filter((s) => s.ai !== 'support' && s.ai !== 'defense' && d <= s.range + 20);
-      if (fit.length && Math.random() < 0.45) pick = fit[Math.floor(Math.random() * fit.length)];
+      const eager = g === 'assault' ? 0.6 : g === 'support' ? 0.2 : 0.45;
+      if (fit.length && Math.random() < eager) pick = fit[Math.floor(Math.random() * fit.length)];
     }
     if (!pick) return false;
     this.mp -= pick.mp;
@@ -308,6 +338,7 @@ export class Companion extends Actor {
     const t = this.target;
     const speed = 150 * st.move * this.speedMult();
     const dp = dist(this.x, this.y, p.x, p.y);
+    if (this.roam(dt, speed)) return;
     if (dp > 520) {
       const pos = G.world.map.nearestFree(p.x - Math.cos(p.aim) * 40, p.y - Math.sin(p.aim) * 30, 4);
       this.x = pos.x;
@@ -316,9 +347,29 @@ export class Companion extends Actor {
       return;
     }
     if (t && !t.dead && dp < 420) {
+      this.engage(t, speed, dt);
+    } else {
+      const fx0 = p.x - Math.cos(p.aim) * 46;
+      const fy0 = p.y - Math.sin(p.aim) * 30;
+      if (dist(this.x, this.y, fx0, fy0) > 34) {
+        this.walkToward(fx0, fy0, speed * (dp > 160 ? 1.25 : 1), dt);
+        this.dir = dirFromAngle(angTo(this.x, this.y, fx0, fy0));
+        this.aim = angTo(this.x, this.y, fx0, fy0);
+      } else {
+        this.aim = p.aim;
+        this.dir = p.dir;
+      }
+    }
+    this.anim.kind = this.guard ? 'block' : this.moving ? 'walk' : 'idle';
+  }
+
+  /** approach and strike a target with the weapon combo (shared by every companion role) */
+  protected engage(t: Actor, speed: number, dt: number): void {
+    const st = this.stats;
+    {
       const d = dist(this.x, this.y, t.x, t.y);
       const ranged = this.mode === 'bow' || this.mode === 'staff';
-      const want = ranged ? 190 : reachOf(this.mode) * 0.8 + t.radius;
+      const want = ranged ? (this.gambit() === 'support' ? 230 : 190) : reachOf(this.mode) * 0.8 + t.radius;
       this.aim = angTo(this.x, this.y, t.x, t.y);
       this.dir = dirFromAngle(this.aim);
       if (d > want + 6) this.walkToward(t.x, t.y, speed, dt);
@@ -335,22 +386,16 @@ export class Companion extends Actor {
         this.anim.hand = h.hand;
         if (!ranged) audio.play('swing', 0.35);
       }
-    } else {
-      const fx0 = p.x - Math.cos(p.aim) * 46;
-      const fy0 = p.y - Math.sin(p.aim) * 30;
-      if (dist(this.x, this.y, fx0, fy0) > 34) {
-        this.walkToward(fx0, fy0, speed * (dp > 160 ? 1.25 : 1), dt);
-        this.dir = dirFromAngle(angTo(this.x, this.y, fx0, fy0));
-        this.aim = angTo(this.x, this.y, fx0, fy0);
-      } else {
-        this.aim = p.aim;
-        this.dir = p.dir;
-      }
     }
     this.anim.kind = this.guard ? 'block' : this.moving ? 'walk' : 'idle';
   }
 
-  private walkToward(tx: number, ty: number, speed: number, dt: number): void {
+  /** subclasses that do not follow the Diver (adventurers) take over movement here */
+  protected roam(_dt: number, _speed: number): boolean {
+    return false;
+  }
+
+  protected walkToward(tx: number, ty: number, speed: number, dt: number): void {
     let a = angTo(this.x, this.y, tx, ty);
     if (!G.world.map.los(this.x, this.y, tx, ty)) {
       const fa = G.world.flowDir(this.x, this.y);

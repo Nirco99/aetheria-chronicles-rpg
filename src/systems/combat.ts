@@ -7,12 +7,18 @@ import type { Monster } from '../entities/monster';
 import type { Companion } from '../entities/companion';
 import { G } from '../core/state';
 import { BREAK_CRIT_MULT, BREAK_STUN, HITSTOP, PARRY_WINDOW } from '../data/constants';
-import { randomGear, makeGear, GEAR_BASE_IDS } from '../data/items';
+import { randomGear, makeGear, GEAR_BASE_IDS, randomUnique } from '../data/items';
+import { tierForLevel } from '../data/constants';
 import { GEM_TYPES } from '../data/constants';
 import { angDiff, angTo, chance, clamp, rnd, rndi } from '../engine/util';
 import { audio } from '../engine/audio';
 import { fx, NUM_COLORS } from '../render/fx';
 import { checkAwakenings, gainMastery, gainXp } from './progression';
+import type { Breakable } from '../entities/breakable';
+import { gaugeOf, paintGauge } from './reactions';
+import { onBlockPowers, onBreakPower, onEnemyKilled, onParryPowers, onPlayerHit, onPlayerHurt, powerDamageBonus, tryPhoenixRevive } from './powers';
+import { RIPOSTE_WINDOW, style } from './feel';
+import { checkAchievements } from './achievements';
 
 export interface HitOpts {
   mult?: number;
@@ -85,6 +91,10 @@ export function applyBreak(t: Actor, amount: number): void {
   }
   fx.ring(t.x, t.y, '#ffd166', 10, big ? 150 : 90, 0.55, 6);
   fx.burst(t.x, t.y - 20, '#ffd166', 18, 160);
+  if (t.team === 'enemy') {
+    onBreakPower(t);
+    style.add(big ? 120 : 50, 'Break');
+  }
   if (big) {
     fx.banner('BREAK!!', '#ffd166', 'Stunned - every hit is a 150% critical!', 76, 1.5);
     fx.flash('#ffd166', 0.22);
@@ -99,20 +109,38 @@ export function applyBreak(t: Actor, amount: number): void {
 
 function perfectParry(p: Player, src: Actor | null): void {
   const s = G.save;
-  fx.ring(p.x, p.y, '#7fe9ff', 12, 110, 0.45, 6);
-  fx.sparks(p.x + Math.cos(p.aim) * 18, p.y - 18 + Math.sin(p.aim) * 10, '#bff3ff', 16, 220);
-  fx.number(p.x, p.y - 44, 'PERFECT PARRY', NUM_COLORS.shield, 15);
+  // 50ms time-freeze, ring shockwave, 30% MP & Stamina, a massive Break chunk and a riposte window
+  G.game.freeze(0.05);
+  fx.ring(p.x, p.y, '#7fe9ff', 12, 130, 0.45, 7);
+  fx.ring(p.x, p.y, '#ffffff', 6, 70, 0.3, 3);
+  fx.sparks(p.x + Math.cos(p.aim) * 18, p.y - 18 + Math.sin(p.aim) * 10, '#bff3ff', 18, 240);
+  fx.number(p.x, p.y - 44, 'PERFECT PARRY', NUM_COLORS.shield, 17);
+  fx.flash('#bff3ff', 0.1);
   audio.play('parry');
   fx.shake(5);
-  G.game.slowmo(0.18, 0.3);
-  p.mp = Math.min(p.stats.maxMp, p.mp + 25);
-  p.sta = Math.min(p.stats.maxSta, p.sta + 25);
+  G.game.slowmo(0.22, 0.3);
+  p.mp = Math.min(p.stats.maxMp, p.mp + p.stats.maxMp * 0.3);
+  p.sta = Math.min(p.stats.maxSta, p.sta + p.stats.maxSta * 0.3);
   p.atkCd = 0;
   p.parryFlash = 0.25;
+  p.riposteT = RIPOSTE_WINDOW;
   if (src && src.kind === 'monster') {
-    applyBreak(src, 60);
-    src.hitstop = Math.max(src.hitstop, 0.18);
+    applyBreak(src, 40 + src.brkMax * 0.35);
+    src.hitstop = Math.max(src.hitstop, 0.2);
+    src.kbx += Math.cos(p.aim) * 120;
+    src.kby += Math.sin(p.aim) * 120;
   }
+  for (const f of G.world.targetsFor('player')) {
+    if (f === src || f.dead || f.kind === 'prop') continue;
+    const d = Math.hypot(f.x - p.x, f.y - p.y);
+    if (d < 110) {
+      const a = angTo(p.x, p.y, f.x, f.y);
+      f.kbx += Math.cos(a) * 140;
+      f.kby += Math.sin(a) * 140;
+    }
+  }
+  style.add(110, 'Perfect Parry');
+  onParryPowers();
   s.counters.perfectParries++;
   gainMastery(p.hasShield() ? 'shield' : 'sword', 10 + p.level);
   checkAwakenings();
@@ -122,6 +150,7 @@ function perfectParry(p: Player, src: Actor | null): void {
 
 export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
   if (t.dead || t.removed) return 0;
+  if (t.kind === 'prop') return (t as Breakable).hit(src, o);
   if (t.iframes > 0 && o.source !== 'dot') return 0;
   if (t.inCitadel && t.team === 'player') {
     if (!o.noNumber) fx.number(t.x, t.y - 34, 'IMMUNE', NUM_COLORS.shield, 13);
@@ -142,7 +171,13 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
     dmg = atk * (o.mult ?? 1) * (100 / (100 + 2.5 * Math.max(0, def))) * rnd(0.92, 1.08);
     if (o.bonus) dmg *= 1 + o.bonus;
     const critChance = src.stats.crit + (o.crit ?? 0);
-    if (t.broken > 0) {
+    const deadeye = src.kind === 'player' && t.team === 'enemy' && t.hp >= t.stats.maxHp && G.save.keystones.includes('ks_bow');
+    if (o.isSkill) dmg *= 1 + src.stats.skillDmg;
+    if (src.kind === 'player') dmg *= powerDamageBonus(src, t);
+    if (deadeye && !o.forceCrit) {
+      crit = true;
+      dmg *= src.stats.critDmg;
+    } else if (t.broken > 0) {
       crit = true;
       dmg *= Math.max(BREAK_CRIT_MULT, src.stats.critDmg);
     } else if (o.forceCrit || Math.random() < critChance) {
@@ -210,7 +245,7 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
       return 0;
     }
     if (p.blocking && front && o.canBlock !== false) {
-      const window = PARRY_WINDOW + 0.04 * (G.save.passives['sw_p_riposte'] ?? 0);
+      const window = PARRY_WINDOW + 0.04 * (G.save.passives['sw_p_riposte'] ?? 0) + (G.save.keystones.includes('ks_shield') ? 0.08 : 0);
       if (G.time - p.blockStart <= window) {
         perfectParry(p, src);
         return 0;
@@ -220,7 +255,8 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
       const prevented = dmg * red;
       dmg -= prevented;
       const steadfast = G.save.passives['sh_p_steadfast'] ?? 0;
-      p.sta -= Math.max(5, prevented * 0.5) * (1 - 0.12 * steadfast);
+      p.sta -= Math.max(5, prevented * 0.5) * (1 - 0.12 * steadfast) * (G.save.keystones.includes('ks_shield') ? 0.5 : 1);
+      onBlockPowers();
       p.staDelay = 0.8;
       G.save.counters.dmgBlocked += Math.round(prevented);
       fx.number(p.x + 12, p.y - 40, String(Math.round(prevented)), NUM_COLORS.shield, 13);
@@ -257,7 +293,10 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
   }
 
   dmg = Math.round(dmg);
+  if (G.world.duel) dmg = G.world.duelClamp(t, src, dmg);
   t.hp -= dmg;
+  t.lastDmg = dmg;
+  if (src) t.lastHitBy = src;
   if (o.source !== 'dot') {
     t.hitstop = Math.max(t.hitstop, HITSTOP);
     t.flash = 0.12;
@@ -271,6 +310,7 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
     if (src && src.stats.elem.wind) kb += 60 * resist;
     t.kbx += Math.cos(ka) * kb;
     t.kby += Math.sin(ka) * kb;
+    t.kbFresh = 0.35;
   }
   // numbers & sound
   if (!o.noNumber) {
@@ -292,6 +332,10 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
         fx.shake(3);
         fx.flash('#ff2a40', 0.08);
         (t as Player).onHurt();
+        const frac = dmg / Math.max(1, t.stats.maxHp);
+        if (frac >= 0.12) t.iframes = Math.max(t.iframes, 0.35);
+        style.hurt(frac);
+        onPlayerHurt(src, dmg);
       }
     } else audio.play(crit ? 'crit' : 'hit');
     fx.sparks(t.x, t.y - 18, crit ? '#ffd166' : elemental ? '#c18cff' : '#ffffff', crit ? 12 : 6, crit ? 220 : 150);
@@ -307,13 +351,19 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
     const resist = t.kind === 'monster' ? ((t as Monster).isBoss ? 0.6 : (t as Monster).isElite ? 0.3 : 0) : 0;
     if (t.addStatus(o.status, resist)) statusFx(t, o.status.kind);
   }
-  if (src && src.team === 'player' && t.team === 'enemy' && o.flat === undefined) elementProcs(src, t, dmg);
+  if (src && src.team === 'player' && t.team === 'enemy' && o.flat === undefined) {
+    elementProcs(src, t, dmg);
+    paintHit(src, t, dmg, crit, o);
+    onPlayerHit(src, t, dmg, crit, o);
+    if (src.kind === 'player') style.add(7 + (crit ? 6 : 0) + (o.isSkill ? 5 : 0));
+  }
   if (src && src.kind === 'monster' && (src as Monster).mods.includes('Vampiric') && !src.dead) {
     src.hp = Math.min(src.stats.maxHp, src.hp + dmg * 0.15);
   }
   if (src && src.kind === 'monster' && (src as Monster).mods.includes('Molten') && chance(0.35)) t.addStatus({ kind: 'burn', dur: 3 });
 
   // bookkeeping
+  if (src && src.kind === 'monster') (t as { onMonsterHit?: () => void }).onMonsterHit?.();
   if (t.kind === 'monster') {
     const m = t as Monster;
     m.hpBarT = 5;
@@ -323,17 +373,19 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
   if (src && src.team === 'player' && t.team === 'enemy' && o.source !== 'reflect') {
     const p = G.player;
     p.lastCombat = G.time;
-    if (G.world.companion && !G.world.companion.dead) p.switchGauge = Math.min(100, p.switchGauge + (src.kind === 'player' ? 2.6 : 3.4) * (crit ? 1.5 : 1));
+    if (G.world.party.some((c) => !c.dead)) p.switchGauge = Math.min(100, p.switchGauge + (src.kind === 'player' ? 2.6 : 3.4) * (crit ? 1.5 : 1));
     if (src.kind === 'player') {
       p.onDealtDamage(t, crit);
       const b = o.branch ?? p.basicBranch();
       if (b) gainMastery(b, (3 + t.level * 0.9) * (o.isSkill ? 1.4 : 1));
     }
   }
+  if (src && src.kind === 'player' && t.team === 'enemy') (src as Player).focus = t;
   if (t.kind === 'player') {
     const p = t as Player;
     p.lastCombat = G.time;
     p.checkEmergencyAegis();
+    if (t.hp <= 0 && tryPhoenixRevive()) return dmg;
   }
 
   if (t.hp <= 0) {
@@ -341,6 +393,28 @@ export function damage(src: Actor | null, t: Actor, o: HitOpts): number {
     onKill(t, src);
   }
   return dmg;
+}
+
+/** paints reaction gauges from the hit's element, the weapon's gems / oils and blade crits */
+function paintHit(src: Actor, t: Actor, dmg: number, crit: boolean, o: HitOpts): void {
+  if (o.source === 'reflect' || o.source === 'dot' || o.source === 'zone' || t.dead) return;
+  const g = gaugeOf(o.element);
+  if (g) {
+    paintGauge(src, t, g, dmg);
+    return;
+  }
+  const elems = Object.keys(src.stats.elem) as Element[];
+  if (elems.length && Math.random() < 0.35) {
+    const eg = gaugeOf(elems[Math.floor(Math.random() * elems.length)]);
+    if (eg) {
+      paintGauge(src, t, eg, dmg);
+      return;
+    }
+  }
+  if (crit && src.kind === 'player') {
+    const mode = (src as Player).mode;
+    if ((mode === 'sword' || mode === 'dual' || mode === 'spear' || mode === 'halberd') && Math.random() < 0.6) paintGauge(src, t, 'bleed', dmg);
+  }
 }
 
 function statusFx(t: Actor, kind: string): void {
@@ -416,7 +490,14 @@ export function rollLoot(m: Monster): LootBundle {
   if (chance(gemChance)) items.push(['gem_' + GEM_TYPES[rndi(0, 4)], 1]);
   const src = floor >= 20 ? 3 : boss ? 2 : elite ? 1 : 0;
   const nGear = boss ? 3 : elite ? (chance(0.4) ? 2 : 1) : chance(0.06) ? 1 : 0;
-  for (let i = 0; i < nGear; i++) gear.push(randomGear(lvl, src));
+  const mf = G.player ? G.player.stats.magicFind : 0;
+  for (let i = 0; i < nGear; i++) gear.push(randomGear(lvl, src, mf));
+  const uniqueChance = m.raid ? 0.45 : boss ? (floor >= 15 ? 0.18 : 0.1) : elite ? 0.015 : 0;
+  if (uniqueChance > 0 && chance(uniqueChance * (1 + mf))) {
+    gear.push(randomUnique(tierForLevel(lvl)));
+    G.save.counters.uniquesFound++;
+  }
+  if ((boss || elite) && chance(0.12)) items.push(['treasure_map', 1]);
   if (floor >= 10) {
     if (chance(boss || elite ? 0.5 : 0.04)) items.push(['relic_shard', 1]);
     if (boss && chance(0.35)) items.push(['mythic_core', 1]);
@@ -432,6 +513,10 @@ function onKill(t: Actor, src: Actor | null): void {
     m.die();
     const s = G.save;
     s.counters.kills++;
+    s.bestiary[m.def.id] = (s.bestiary[m.def.id] ?? 0) + 1;
+    for (const c of G.world.party) if (!c.dead) s.affinity[c.def.id] = (s.affinity[c.def.id] ?? 0) + (m.isBoss ? 40 : m.isElite ? 8 : 1);
+    onEnemyKilled(m);
+    style.add(m.isBoss ? 200 : m.isElite ? 80 : 25, 'Kill');
     gainXp(m.xpValue);
     const loot = rollLoot(m);
     if (loot.gold > 0 || loot.items.length || loot.gear.length) G.world.spawnLoot(m.x, m.y, loot, m.isBoss ? 'chest' : 'crystal');
@@ -440,10 +525,14 @@ function onKill(t: Actor, src: Actor | null): void {
       const p = src as Player;
       p.onKill(m);
     }
+    checkAchievements();
   } else if (t.kind === 'player') {
     (t as Player).die();
   } else if (t.kind === 'companion') {
     (t as Companion).knockOut();
+  } else {
+    t.dead = true;
+    (t as { onDeath?: () => void }).onDeath?.();
   }
 }
 

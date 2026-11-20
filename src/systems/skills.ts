@@ -1,8 +1,9 @@
 // Sword Skill executor: runs the timeline scripts from data/skills.ts. A 0.12s Pre-Motion
 // Initiation Flash precedes every skill, then scripted dashes, leaps, hits and ribbons play out.
 import type {
-  ActiveSkillDef, BuffSpec, Element, ProjSpec, RibbonSpec, SfxName, SkillAPI, SkillCaster, SkillHitOpts, StatusApply, TeleShape, ZoneSpec,
+  ActiveSkillDef, BuffSpec, Element, MorphKind, ProjSpec, RibbonSpec, SfxName, SkillAPI, SkillCaster, SkillHitOpts, StatusApply, TeleShape, ZoneSpec,
 } from '../types/game';
+import { BRANCH_ELEMENT, MORPHS } from '../data/v3';
 import type { Actor } from '../entities/actor';
 import type { Monster } from '../entities/monster';
 import { G } from '../core/state';
@@ -27,6 +28,8 @@ export class SkillRun implements SkillAPI {
   private dashS: { ang: number; speed: number; rem: number } | null = null;
   private leapS: { x0: number; y0: number; x1: number; y1: number; t: number; dur: number } | null = null;
   private aimV: number;
+  /** seconds since the skill's final scripted event fired (-1 while events remain) */
+  doneT = -1;
 
   constructor(
     readonly actor: Actor,
@@ -35,8 +38,29 @@ export class SkillRun implements SkillAPI {
     readonly ty: number,
     private mult: number,
     private tint: string | null,
+    readonly morph: MorphKind | null = null,
   ) {
     this.aimV = actor.aim;
+    if (morph === 'power') this.mult *= 1.35;
+    if (morph) this.tint = this.tint ? mix(this.tint, MORPHS[morph].color, 0.5) : mix(def.color, MORPHS[morph].color, 0.45);
+  }
+
+  /** still in the 0.12s Pre-Motion flash (cancellable startup) */
+  get preMotion(): boolean {
+    return !this.started;
+  }
+
+  /** every scripted strike has resolved: only recovery frames remain */
+  get eventsDone(): boolean {
+    return this.started && this.events.length === 0 && !this.dashS && !this.leapS;
+  }
+
+  private get element(): Element | undefined {
+    return this.morph === 'leech' ? BRANCH_ELEMENT[this.def.branch] : undefined;
+  }
+
+  private get areaMult(): number {
+    return this.morph === 'power' ? 1.15 : 1;
   }
 
   get caster(): SkillCaster {
@@ -94,6 +118,7 @@ export class SkillRun implements SkillAPI {
       this.moveWin.t -= dt;
       if (this.moveWin.t <= 0) this.moveWin = null;
     }
+    if (this.eventsDone) this.doneT = this.doneT < 0 ? 0 : this.doneT + dt;
     if (this.started && this.t >= this.def.dur && this.events.length === 0 && !this.dashS && !this.leapS) this.done = true;
   }
 
@@ -138,17 +163,21 @@ export class SkillRun implements SkillAPI {
     a.iframes = Math.max(a.iframes, dur * 0.85);
   }
 
-  hit(o: SkillHitOpts): number {
+  hit(o: SkillHitOpts, echo = false): number {
     const a = this.actor;
     const ang = this.aimV + (o.angle ?? 0);
+    const am = this.areaMult;
+    // player hitboxes are 15% more generous than the ribbon you see
+    const wide = a.kind === 'player' ? 1.15 : 1;
     let shape: TeleShape;
-    if (o.shape === 'arc') shape = { kind: 'cone', x: a.x, y: a.y, a: ang, arc: o.arc ?? 1.6, r: o.range ?? 60 };
+    if (o.shape === 'arc') shape = { kind: 'cone', x: a.x, y: a.y, a: ang, arc: (o.arc ?? 1.6) * wide, r: (o.range ?? 60) * am };
     else if (o.shape === 'circle') {
       const px = o.at === 'cursor' ? this.tx : o.at === 'point' ? (o.px ?? a.x) : a.x;
       const py = o.at === 'cursor' ? this.ty : o.at === 'point' ? (o.py ?? a.y) : a.y;
-      shape = { kind: 'circle', x: px, y: py, r: o.range ?? 80 };
-    } else if (o.shape === 'line') shape = { kind: 'line', x: a.x, y: a.y, a: ang, len: o.range ?? 120, w: o.width ?? 30 };
-    else shape = { kind: 'ring', x: a.x, y: a.y, r: o.range ?? 120, inner: o.inner ?? 60 };
+      shape = { kind: 'circle', x: px, y: py, r: (o.range ?? 80) * am };
+    } else if (o.shape === 'line') shape = { kind: 'line', x: a.x, y: a.y, a: ang, len: (o.range ?? 120) * am, w: (o.width ?? 30) * wide * am };
+    else shape = { kind: 'ring', x: a.x, y: a.y, r: (o.range ?? 120) * am, inner: o.inner ?? 60 };
+    if (echo) o = { ...o, ribbon: false };
     if (o.ribbon !== false) {
       const r: RibbonSpec | null = o.ribbon ?? (o.shape === 'arc' ? { a0: -(o.arc ?? 1.6) / 2, a1: (o.arc ?? 1.6) / 2, r: (o.range ?? 60) * 0.85 }
         : o.shape === 'line' ? { a0: 0, a1: 0, style: 'thrust', len: o.range ?? 120 }
@@ -156,20 +185,43 @@ export class SkillRun implements SkillAPI {
       if (r) this.ribbon(r);
     }
     let n = 0;
+    const mult = o.mult * this.mult * (echo ? 0.4 / (this.morph === 'power' ? 1.35 : 1) : 1);
     for (const t of targetsOf(a)) {
       if (t.dead || !hitTest(shape, t.x, t.y, t.radius)) continue;
-      damage(a, t, {
-        mult: o.mult * this.mult, magic: o.magic, element: o.element, brk: o.brk, kb: o.kb, status: o.status, crit: o.crit, forceCrit: o.forceCrit,
-        isSkill: true, branch: this.def.branch, source: 'skill', kbAngle: o.shape === 'line' ? ang : undefined,
+      const exec = this.morph === 'power' && t.hp < t.stats.maxHp * 0.3 ? 0.5 : 0;
+      const dealt = damage(a, t, {
+        mult, magic: o.magic, element: this.element ?? o.element, brk: o.brk, kb: o.kb, status: o.status, crit: o.crit, forceCrit: o.forceCrit,
+        isSkill: true, branch: this.def.branch, source: 'skill', kbAngle: o.shape === 'line' ? ang : undefined, bonus: exec || undefined,
       });
+      if (this.morph === 'leech' && dealt > 0) a.hp = Math.min(a.stats.maxHp, a.hp + dealt * 0.08);
       n++;
       if (o.maxTargets && n >= o.maxTargets) break;
+    }
+    if (this.morph === 'clone' && !echo) {
+      G.world.after(0.25, () => {
+        if (a.dead) return;
+        a.anim.ghosts.push({ x: a.x, y: a.y, z: a.z, t: 0.3, dir: a.dir });
+        const s = shape;
+        const col = '#b07bff';
+        if (s.kind === 'cone') fx.ribbon(a.x, a.y, ang, { a0: -s.arc / 2, a1: s.arc / 2, r: s.r * 0.85, w: 9 }, col, '#2a1f44');
+        else if (s.kind === 'line') fx.ribbon(a.x, a.y, ang, { a0: 0, a1: 0, style: 'thrust', len: s.len, w: 10 }, col, '#2a1f44');
+        else fx.ring(s.x, s.y, col, 8, s.r, 0.35, 4);
+        this.hit(o, true);
+      });
     }
     return n;
   }
 
   proj(p: ProjSpec, angle: number): void {
-    G.world.spawnProjectile(this.actor, { ...p, mult: p.mult * this.mult }, angle, this.tx, this.ty, this.def.branch, true);
+    const spec: ProjSpec = { ...p, mult: p.mult * this.mult, element: this.element ?? p.element, radius: (p.radius ?? 7) * this.areaMult, aoe: p.aoe ? p.aoe * this.areaMult : undefined };
+    if (this.morph) spec.color = this.tint ?? spec.color;
+    G.world.spawnProjectile(this.actor, spec, angle, this.tx, this.ty, this.def.branch, true);
+    if (this.morph === 'clone') {
+      const a = this.actor;
+      G.world.after(0.25, () => {
+        if (!a.dead) G.world.spawnProjectile(a, { ...spec, mult: spec.mult * 0.4 / (this.morph === 'power' ? 1.35 : 1), color: '#b07bff' }, angle, this.tx, this.ty, this.def.branch, true);
+      });
+    }
   }
 
   blinkBehind(maxDist: number): boolean {
@@ -258,7 +310,8 @@ export class SkillRun implements SkillAPI {
       const target: Actor = cur;
       fx.bolt(fx0, fy0, target.x, target.y - 20, '#ffe066');
       fx.burst(target.x, target.y - 18, '#ffe066', 8, 90);
-      damage(a, target, { mult: m, magic: true, element, status, isSkill: true, branch: this.def.branch, brk: 6, source: 'skill' });
+      const dealt = damage(a, target, { mult: m, magic: true, element: this.element ?? element, status, isSkill: true, branch: this.def.branch, brk: 6, source: 'skill' });
+      if (this.morph === 'leech' && dealt > 0) a.hp = Math.min(a.stats.maxHp, a.hp + dealt * 0.08);
       hit.add(target.id);
       fx0 = target.x;
       fy0 = target.y - 20;
@@ -308,6 +361,6 @@ export class SkillRun implements SkillAPI {
   }
 
   rain(x: number, y: number, r: number, count: number, dur: number, mult: number, element: Element): void {
-    G.world.addRain(this.actor, x, y, r, count, dur, mult * this.mult, element);
+    G.world.addRain(this.actor, x, y, r * this.areaMult, count, dur, mult * this.mult, this.element ?? element);
   }
 }

@@ -11,6 +11,10 @@ import {
   openColiseum, openAbyssGate, openCraft, openDecorPalette, openEstate, openForge, openGate, openGuild, openMount, openNpc, openShop, openVault, closeDecorPalette,
 } from './town';
 import type { ShopKind } from '../types/game';
+import type { Adventurer } from '../entities/allies';
+import {
+  openAdventurer, openBestiary, openBlackMarket, openCodex, openConstellation, openFishing, openJournal, openRaidBriefing, openStable, openWardrobe,
+} from './v3ui';
 
 export type ToastKind = 'info' | 'warn' | 'loot' | 'mastery' | 'buff' | 'boss' | 'market';
 
@@ -244,5 +248,36 @@ export class UI {
   }
   get gameReady(): boolean {
     return !!G.save;
+  }
+  // ---- v3 panels
+  openConstellation(): void {
+    openConstellation();
+  }
+  openBestiary(): void {
+    openBestiary();
+  }
+  openJournal(): void {
+    openJournal();
+  }
+  openStable(): void {
+    openStable();
+  }
+  openWardrobe(): void {
+    openWardrobe();
+  }
+  openCodex(atForge: boolean): void {
+    openCodex(atForge);
+  }
+  openBlackMarket(): void {
+    openBlackMarket();
+  }
+  openAdventurer(a: Adventurer): void {
+    openAdventurer(a);
+  }
+  openFishing(spot: number): void {
+    openFishing(spot);
+  }
+  openRaidBriefing(name: string, desc: string, level: number, onAccept: (vanguard: boolean) => void, onDecline?: () => void): void {
+    openRaidBriefing(name, desc, level, onAccept, onDecline);
   }
 }

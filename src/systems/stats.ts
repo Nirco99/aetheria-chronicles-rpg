@@ -5,6 +5,7 @@ import { gearStats, isBlade } from '../data/items';
 import { GEM_INFO } from '../data/constants';
 import { PASSIVE_SKILLS } from '../data/skills';
 import { GUILDS, GUILD_IDS, guildRank } from '../data/guilds';
+import { BRIDGE_BY_ID, KEYSTONE_BY_ID, POWER_BY_ID, SETS, setCountsOf, setStats } from '../data/v3';
 
 export type WeaponMode = 'sword' | 'dual' | 'spear' | 'halberd' | 'bow' | 'staff' | 'fists';
 
@@ -53,10 +54,11 @@ export function modeBranch(mode: WeaponMode, hasShield: boolean): Branch | null 
 interface Acc {
   atk: number; def: number; mag: number; hp: number; mp: number; crit: number; critDmg: number; aspd: number; move: number;
   brk: number; block: number; regen: number; atkPct: number; defPct: number; magPct: number; hpPct: number; xpPct: number;
+  lifesteal: number; skillDmg: number; cdr: number; magicFind: number;
 }
 
 function acc(): Acc {
-  return { atk: 0, def: 0, mag: 0, hp: 0, mp: 0, crit: 0, critDmg: 0, aspd: 0, move: 0, brk: 0, block: 0, regen: 0, atkPct: 0, defPct: 0, magPct: 0, hpPct: 0, xpPct: 0 };
+  return { atk: 0, def: 0, mag: 0, hp: 0, mp: 0, crit: 0, critDmg: 0, aspd: 0, move: 0, brk: 0, block: 0, regen: 0, atkPct: 0, defPct: 0, magPct: 0, hpPct: 0, xpPct: 0, lifesteal: 0, skillDmg: 0, cdr: 0, magicFind: 0 };
 }
 
 function add(a: Acc, s: StatBlock | undefined): void {
@@ -80,6 +82,10 @@ function finish(level: number, a: Acc, mult = 1): Stats {
   st.block = Math.min(0.2, a.block);
   st.mpRegen = 1 + a.regen;
   st.xpMult = 1 + a.xpPct;
+  st.lifesteal = Math.min(0.25, a.lifesteal);
+  st.skillDmg = a.skillDmg;
+  st.cdr = Math.min(0.4, a.cdr);
+  st.magicFind = a.magicFind;
   return st;
 }
 
@@ -105,11 +111,34 @@ export function activeSet(save: SaveData): { main: GearItem | null; off: GearIte
   return save.activeSet === 'A' ? { main: save.equip.mainA, off: save.equip.offA } : { main: save.equip.mainB, off: save.equip.offB };
 }
 
-export function playerStats(save: SaveData, buffs: BuffInst[]): Stats {
+/** every golden power currently active: equipped legendary/unique gear, relic slots, 6-piece sets */
+export function activePowers(save: SaveData): Set<string> {
+  const out = new Set<string>();
+  const { main, off } = activeSet(save);
+  for (const g of [main, off, save.equip.head, save.equip.chest, save.equip.boots, save.equip.cloak]) if (g?.power) out.add(g.power);
+  for (const id of Object.values(save.relics ?? {})) if (id) out.add(id);
+  setCountsOf(save).forEach((n, i) => {
+    if (n >= 6) out.add(SETS[i].b6.power);
+  });
+  return out;
+}
+
+/** style rank 0 (D) .. 6 (SSS) adds attack speed, move speed and magic find */
+export function styleBonus(rank: number): { aspd: number; move: number; magicFind: number } {
+  const k = Math.max(0, Math.min(6, rank)) / 6;
+  return { aspd: 0.25 * k, move: 0.15 * k, magicFind: 0.4 * k };
+}
+
+export function playerStats(save: SaveData, buffs: BuffInst[], style = 0): Stats {
   const a = acc();
   const { main, off } = activeSet(save);
   const branches = setBranches(main, off);
   for (const g of [main, off, save.equip.head, save.equip.chest, save.equip.boots, save.equip.cloak]) if (g) add(a, gearStats(g));
+  for (const sb of setStats(save)) add(a, sb);
+  for (const id of activePowers(save)) add(a, POWER_BY_ID[id]?.stats);
+  for (const id of save.keystones ?? []) add(a, KEYSTONE_BY_ID[id]?.stats);
+  for (const id of save.bridges ?? []) add(a, BRIDGE_BY_ID[id]?.stats);
+  if (style > 0) add(a, styleBonus(style));
   for (const p of PASSIVE_SKILLS) {
     const lvl = save.passives[p.id] ?? 0;
     if (lvl > 0 && p.stats && branches.has(p.branch)) add(a, p.stats(lvl));
@@ -128,13 +157,13 @@ export function playerStats(save: SaveData, buffs: BuffInst[]): Stats {
   return st;
 }
 
-export function companionStats(level: number, cs: CompanionSave, buffs: BuffInst[]): Stats {
+export function companionStats(level: number, cs: CompanionSave, buffs: BuffInst[], affinityRank = 0): Stats {
   const a = acc();
   for (const g of Object.values(cs.equip)) if (g) add(a, gearStats(g));
   for (const b of buffs) add(a, b.spec.stats);
   const st0 = emptyStats();
   gemBonus(st0, cs.equip.main, a, false);
-  const st = finish(level, a, 0.92);
+  const st = finish(level, a, 0.92 + 0.03 * affinityRank);
   st.elem = st0.elem;
   return st;
 }

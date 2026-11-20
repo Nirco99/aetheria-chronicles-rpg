@@ -324,13 +324,17 @@
     ['Space', L('Dodge roll with invulnerability frames', 'גלגול התחמקות עם חסינות רגעית')],
     ['1 - 6', L('Sword Skills on your hotbar', 'כישורי החרב בסרגל המהיר')],
     ['Q', L('Swap weapon set A / B', 'החלפה בין סט נשק A ו-B')],
-    ['R / Tab', L('SWITCH! with your companion', 'SWITCH! עם בן הלוויה')],
+    ['R / Tab', L('SWITCH! (Triple SWITCH! with two companions)', 'SWITCH! (‏Triple SWITCH! עם שני בני לוויה)')],
+    ['V', L('Mount / dismount (attack while riding = Charge Slam)', 'עלייה / ירידה מבהמה (תקיפה ברכיבה = הסתערות)')],
+    ['F1 - F4', L('Tactical Gambits: Assault, Guard & Peel, Focus My Target, Support & Heal', 'גמביטים טקטיים: הסתערות, שמירה וחילוץ, התמקדות במטרה, תמיכה וריפוי')],
     ['E / F', L('Interact, talk, gather, enter', 'אינטראקציה, דיבור, איסוף, כניסה')],
     ['Z X C', L('Quick-use consumables', 'שימוש מהיר בשיקויים ומזון')],
-    ['I / K / M / H', L('Character, Mastery, Realm Atlas, Handbook', 'דמות, שליטה, אטלס, ספר ההדרכה')],
+    ['I / K / M / H', L('Character, Constellation Skill Graph, Realm Atlas, Handbook', 'דמות, גרף הכישורים הכוכבי, אטלס, ספר ההדרכה')],
+    ['O / N / P / T / U', L('Bestiary, Journal & Titles, Stable & Pets, Wardrobe, Relic Codex', 'בסטיאריום, יומן ותארים, אורווה וחיות מחמד, ארון בגדים, קודקס שרידים')],
     ['B', L('Grid decorator inside your house', 'מעצב הרשת בתוך הבית')],
     ['Esc', L('Pause / close window', 'השהיה / סגירת חלון')],
-    ['F5 / F11', L('Quick save / fullscreen (desktop)', 'שמירה מהירה / מסך מלא (גרסת מחשב)')],
+    ['F5', L('Quick save to the saves folder', 'שמירה מהירה לתיקיית השמירות')],
+    ['F11 / Alt+Enter', L('Toggle fullscreen', 'מעבר למסך מלא')],
   ];
 
   // ================================================================ sections
@@ -338,12 +342,14 @@
 
   function sectionHome() {
     return '<h2>' + esc(t(L('Welcome to the Strategy Wiki', 'ברוכים הבאים לוויקי האסטרטגיה'))) + '</h2>' +
-      '<p class="lead">' + esc(t(L('Aetheria Chronicles: Sword & Forge is a real-time top-down action RPG. Five floating realms, 48 skills across six classless mastery branches, deep blacksmithing, player housing, four guilds, six AI companions, a living economy and an infinite procedural abyss.', 'כרוניקות אתריה: חרב ונפחייה הוא משחק תפקידים ופעולה בזמן אמת במבט עילי. חמש ממלכות מרחפות, 48 כישורים בשישה ענפי שליטה ללא מעמדות, נפחות עמוקה, בתים לשחקן, ארבע גילדות, שישה בני לוויה ממוחשבים, כלכלה חיה ותהום פרוצדורלית אינסופית.'))) + '</p>' +
+      '<p class="lead">' + esc(t(L('Aetheria Chronicles: Sword & Forge - Full-Dive Desktop Edition is a standalone Windows action RPG. Five floating realms, 30 Sword Skills with 90 Rune Morphs, Skill Connect chains, Wall-Slam physics, six elemental reactions, unique weapons, armor sets and a Relic Codex, a party of two plus 6-hero raids, simulated adventurers, mounts, pets, fishing, a living economy and an infinite procedural abyss. This wiki is the only part on the web.', 'כרוניקות אתריה: חרב ונפחייה - מהדורת Full-Dive למחשב הוא משחק תפקידים ופעולה עצמאי ל-Windows. חמש ממלכות מרחפות, 30 כישורי חרב עם 90 מורפים רוניים, שרשראות Skill Connect, פיזיקת הטחה בקיר, שש תגובות יסודיות, נשקים ייחודיים, סטים של שריון וקודקס שרידים, חבורה של שניים ופשיטות של 6 גיבורים, הרפתקנים מדומים, בהמות רכיבה, חיות מחמד, דיג, כלכלה חיה ותהום פרוצדורלית אינסופית. הוויקי הזה הוא החלק היחיד שנמצא ברשת.'))) + '</p>' +
       '<div class="grid">' +
       card(L('Start here', 'התחילו כאן'), L('Learn the controls, Perfect Parry, the Break Bar and SWITCH! combos in Controls & Combat.', 'למדו את השליטה, ההדיפה המושלמת, מד השבירה ושילובי SWITCH! בפרק שליטה וקרב.')) +
       card(L('Plan your build', 'תכננו את המבנה'), L('Browse and filter every Sword Skill and passive in the interactive Skill Tree.', 'עיינו וסננו כל כישור חרב ופסיבי בעץ הכישורים האינטראקטיבי.')) +
       card(L('Forge legends', 'זייפו אגדות'), L('Use the Blueprint Calculator to compare tiers, grades and tempering before you spend materials.', 'השתמשו במחשבון השרטוטים כדי להשוות דרגות, איכות וחישול לפני שתוציאו חומרים.')) +
       card(L('Conquer the realms', 'כבשו את הממלכות'), L('The Realm Atlas and Boss guides explain every city, dungeon, house price and boss phase.', 'אטלס הממלכות ומדריכי הבוסים מסבירים כל עיר, מבוך, מחיר בית ושלב בוס.')) +
+      card(L('New in v3.0', 'חדש בגרסה 3.0'), L('Full-Dive combat, the Constellation graph, elemental reactions, uniques and sets, the Relic Codex, 6-hero raids, adventurers, mounts, pets, fishing and world events - each has its own chapter.', 'קרב Full-Dive, גרף הקונסטלציה, תגובות יסודיות, ייחודיים וסטים, קודקס השרידים, פשיטות של 6 גיבורים, הרפתקנים, רכיבה, חיות מחמד, דיג ואירועי עולם - לכל אחד פרק משלו.')) +
+      card(L('Play on Windows', 'שחקו ב-Windows'), L('Desktop App explains Launch-Aetheria-Desktop.bat, the desktop shortcut, fullscreen and where your saves live.', 'אפליקציית המחשב מסבירה את Launch-Aetheria-Desktop.bat, קיצור הדרך בשולחן העבודה, מסך מלא והיכן נשמרות השמירות.')) +
       '</div>';
   }
 
@@ -358,7 +364,7 @@
     ];
     return '<h2>' + esc(t(L('Controls & Combat', 'שליטה וקרב'))) + '</h2><div class="table-wrap"><table>' + rows + '</table></div>' +
       '<h3>' + esc(t(L('Combat basics', 'יסודות הקרב'))) + '</h3><ul>' + tips.map(function (x) { return '<li>' + esc(t(x)) + '</li>'; }).join('') + '</ul>' +
-      '<h3>' + esc(t(L('Perfect Parry', 'הדיפה מושלמת'))) + '</h3><div class="callout cyan">' + esc(t(L('Press block within 0.25 seconds of an impact (Riposte Instinct adds up to +0.12s). You take no damage, release a shockwave, restore 25 MP and 25 Stamina, your basic attack resets, and the attacker takes 60 Break damage. Holding block longer only reduces damage: 75% with a shield, 50% without, and each blocked hit costs Stamina.', 'לחצו על חסימה בתוך 0.25 שניות מהפגיעה (אינסטינקט התגובה מוסיף עד 0.12 שניות). לא תספגו נזק, ישתחרר גל הדף, תקבלו 25 מאנה ו-25 סיבולת, ההתקפה הבסיסית מתאפסת והתוקף סופג 60 נזק שבירה. חסימה ממושכת רק מפחיתה נזק: 75% עם מגן, 50% בלי, וכל חסימה עולה סיבולת.'))) + '</div>' +
+      '<h3>' + esc(t(L('Perfect Parry', 'הדיפה מושלמת'))) + '</h3><div class="callout cyan">' + esc(t(L('Press block within 0.25 seconds of an impact (Riposte Instinct adds up to +0.12s). Time freezes for 50ms, you take no damage, release a ring shockwave, restore 30% of your MP and Stamina, and the attacker loses 40 + 35% of its Break Bar. Your next attack within 1.5s is a Counter-Riposte critical. Holding block longer only reduces damage: 75% with a shield, 50% without, and each blocked hit costs Stamina.', 'לחצו על חסימה בתוך 0.25 שניות מהפגיעה (אינסטינקט התגובה מוסיף עד 0.12 שניות). הזמן קופא ל-50 אלפיות שנייה, לא תספגו נזק, ישתחרר גל הדף טבעתי, תקבלו בחזרה 30% מהמאנה והסיבולת, והתוקף מאבד 40 ועוד 35% ממד השבירה. ההתקפה הבאה שלכם בתוך 1.5 שניות היא תגובת-נגד קריטית. חסימה ממושכת רק מפחיתה נזק: 75% עם מגן, 50% בלי, וכל חסימה עולה סיבולת.'))) + '</div>' +
       '<h3>' + esc(t(L('Break Bar & Stagger', 'מד השבירה והלם'))) + '</h3><p>' + esc(t(L('The yellow bar under an enemy\'s health is its Break Bar. Heavy hits, shield bashes, skill finishers and parries drain it. When it empties you see "BREAK!!": bosses and elites are stunned for 4 seconds and every attack against them is a 150% critical.', 'הפס הצהוב מתחת לחיי האויב הוא מד השבירה. מכות כבדות, הלמות מגן, סיומי כישורים והדיפות מרוקנים אותו. כשהוא מתרוקן יופיע "BREAK!!": בוסים ועילית מוכים בהלם ל-4 שניות וכל התקפה נגדם היא קריטית של 150%.'))) + '</p>' +
       '<h3>' + esc(t(L('SWITCH! partner combos', 'שילובי SWITCH! עם השותף'))) + '</h3><p>' + esc(t(L('Hits by you and your companion fill the Switch Gauge. When it is full, press R or Tab: time slows for 0.35s, you backstep out of danger with 1.5s of invulnerability and shed enemy aggro, your companion dashes in with a high-Break Synchronized Chain Skill, and your next Sword Skill within 4 seconds deals +35% damage.', 'מכות שלכם ושל בן הלוויה ממלאות את מד ה-Switch. כשהוא מלא לחצו R או Tab: הזמן מאט ל-0.35 שניות, אתם קופצים לאחור עם חסינות של 1.5 שניות ומאבדים את תשומת לב האויבים, בן הלוויה מסתער עם כישור שרשרת מסונכרן ששובר הגנות, וכישור החרב הבא שלכם בתוך 4 שניות גורם +35% נזק.'))) + '</p>' +
       '<h3>' + esc(t(L('Death & respawn', 'מוות ותחייה'))) + '</h3><p>' + esc(t(L('At 0 HP an Emergency Crystal Teleport returns you to the last city\'s Teleport Gate at full HP and MP. You lose 15% of the XP needed for your current level (never a whole level) and a 5% gold fee. Items and gear are never lost, and the Coliseum carries no penalty at all.', 'ב-0 חיים, שיגור קריסטל חירום מחזיר אתכם לשער השיגור של העיר האחרונה עם חיים ומאנה מלאים. תאבדו 15% מהניסיון הדרוש לרמה הנוכחית (לעולם לא רמה שלמה) ודמי תחייה של 5% מהזהב. פריטים וציוד לעולם אינם אובדים, ובקולוסיאום אין עונש בכלל.'))) + '</p>';
@@ -525,7 +531,7 @@
       '<div class="callout">' + esc(t(L('Arbitrage tip: open the Market Ticker at any Market Exchange, buy where a category shows a down arrow, teleport (free) to the city with a Boom and sell there. Gilded Anvil membership adds a shop discount.', 'טיפ ארביטראז\': פתחו את טיקר השוק בכל בורסה, קנו היכן שקטגוריה מסומנת בחץ למטה, השתגרו (בחינם) לעיר עם פריחה ומכרו שם. חברות בסדן המוזהב מוסיפה הנחה בחנויות.'))) + '</div>' +
       '<h3>' + esc(t(L('Player housing', 'בתים לשחקן'))) + '</h3><div class="table-wrap"><table><tr><th>' + esc(t(UI.house)) + '</th><th>' + esc(t(UI.city)) + '</th><th>' + esc(t(UI.price)) + '</th></tr>' +
       REALMS.map(function (r) { return '<tr><td>' + bi(r.house) + '</td><td>' + esc(t(r.city)) + '</td><td class="num">' + r.price.toLocaleString() + '</td></tr>'; }).join('') + '</table></div>' +
-      '<p>' + esc(t(L('Press B inside your house to open the Grid Decorator: left click places, right click picks up. The Storage Vault (100 slots) is shared by every house; the Personal Master Anvil gives +10% forging quality; the Royal Bed lets you sleep until 07:00 and wake Well Rested (+20% XP for 30 minutes); Weapon Racks and Armor Mannequins display the exact gear you mount; boss Trophy Statues come from first-time boss kills and coliseum cups.', 'לחצו B בתוך הבית כדי לפתוח את מעצב הרשת: קליק שמאלי מציב, קליק ימני מרים. הכספת (100 משבצות) משותפת לכל הבתים; הסדן האישי נותן +10% איכות זיוף; המיטה המלכותית מאפשרת לישון עד 07:00 ולהתעורר רעננים (+20% ניסיון ל-30 דקות); מעמדי נשק ובובות שריון מציגים בדיוק את הציוד שתתלו עליהם; פסלי גביע מגיעים מניצחון ראשון על בוסים ומגביעי הקולוסיאום.'))) + '</p>';
+      '<p>' + esc(t(L('Press B inside your house to open the Grid Decorator: left click places, right click picks up. The Storage Vault (100 slots) is shared by every house and every character on this PC (saves\global_vault.json); the Personal Master Anvil gives +10% forging quality; the Royal Bed lets you sleep until 07:00 and wake Well Rested (+20% XP for 30 minutes); Weapon Racks and Armor Mannequins display the exact gear you mount; boss Trophy Statues come from first-time boss kills and coliseum cups.', 'לחצו B בתוך הבית כדי לפתוח את מעצב הרשת: קליק שמאלי מציב, קליק ימני מרים. הכספת (100 משבצות) משותפת לכל הבתים ולכל הדמויות במחשב הזה (saves\global_vault.json); הסדן האישי נותן +10% איכות זיוף; המיטה המלכותית מאפשרת לישון עד 07:00 ולהתעורר רעננים (+20% ניסיון ל-30 דקות); מעמדי נשק ובובות שריון מציגים בדיוק את הציוד שתתלו עליהם; פסלי גביע מגיעים מניצחון ראשון על בוסים ומגביעי הקולוסיאום.'))) + '</p>';
   }
 
   function sectionEndgame() {
@@ -541,10 +547,233 @@
       cups.map(function (c) { return '<tr><td>' + esc(lang === 'he' ? c[1] : c[0]) + '</td><td class="num">' + c[2] + '+</td><td class="num">' + c[3].toLocaleString() + ' ' + esc(t(UI.gold)) + '</td></tr>'; }).join('') + '</table></div>';
   }
 
+  // ================================================================ v3.0 Full-Dive Desktop Edition
+  function list(items) { return '<ul>' + items.map(function (x) { return '<li>' + esc(t(x)) + '</li>'; }).join('') + '</ul>'; }
+  function table(head, rows) {
+    return '<div class="table-wrap"><table><tr>' + head.map(function (h) { return '<th>' + esc(t(h)) + '</th>'; }).join('') + '</tr>' +
+      rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + (typeof c === 'object' ? bi(c) : esc(c)) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table></div>';
+  }
+  function h2(o) { return '<h2>' + esc(t(o)) + '</h2>'; }
+  function h3(o) { return '<h3>' + esc(t(o)) + '</h3>'; }
+  function p(o) { return '<p>' + esc(t(o)) + '</p>'; }
+  function callout(o, cls) { return '<div class="callout ' + (cls || 'cyan') + '">' + esc(t(o)) + '</div>'; }
+
+  function sectionDesktop() {
+    return h2(L('The Desktop Application', 'אפליקציית המחשב')) +
+      p(L('Aetheria Chronicles is a standalone Windows desktop game (Electron). This wiki is the only part that lives on the web - the game itself never opens a browser tab.', 'כרוניקות אתריה הוא משחק מחשב עצמאי ל-Windows (Electron). הוויקי הזה הוא החלק היחיד שנמצא ברשת - המשחק עצמו לעולם לא פותח לשונית דפדפן.')) +
+      h3(L('Install & launch', 'התקנה והפעלה')) + list([
+        L('Run Launch-Aetheria-Desktop.bat. If release\\win-unpacked\\Aetheria Chronicles.exe does not exist yet, it builds it first (Node.js 20+ required once).', 'הריצו את Launch-Aetheria-Desktop.bat. אם הקובץ release\\win-unpacked\\Aetheria Chronicles.exe עדיין לא קיים, הוא נבנה תחילה (נדרש Node.js 20 ומעלה פעם אחת).'),
+        L('Run Create-Desktop-Shortcut.ps1 (right-click > Run with PowerShell) to put an "Aetheria Chronicles" icon on your desktop. Add -StartMenu for a Start Menu entry too.', 'הריצו את Create-Desktop-Shortcut.ps1 (קליק ימני > Run with PowerShell) כדי ליצור סמל "Aetheria Chronicles" על שולחן העבודה. הוסיפו ‎-StartMenu‎ גם לתפריט התחל.'),
+        L('Developers: npm run dist:win builds the exe; npm run electron:dev runs with hot reload; the exe accepts --selftest for an automated 60 FPS smoke test.', 'מפתחים: ‏npm run dist:win בונה את קובץ ההפעלה; ‏npm run electron:dev מריץ עם טעינה חמה; קובץ ההפעלה מקבל ‎--selftest‎ לבדיקת עשן אוטומטית של 60 FPS.'),
+      ]) +
+      h3(L('Window, display & saves', 'חלון, תצוגה ושמירות')) + list([
+        L('Custom dark window frame. F11 or Alt+Enter toggles fullscreen; Settings > Display offers 1280x720, 1600x900, 1920x1080 and 2560x1440 window sizes and supersampled render quality (up to 2x on top of your display scaling).', 'מסגרת חלון כהה מותאמת. ‏F11 או Alt+Enter עוברים למסך מלא; הגדרות > תצוגה מציעות גדלי חלון 1280x720, 1600x900, 1920x1080 ו-2560x1440 ואיכות רינדור עם דגימת-על (עד פי 2 מעל קנה המידה של המסך).'),
+        L('Saves are plain JSON files next to the exe in .\\saves: slot_1.json - slot_3.json, global_vault.json (the 100-slot vault shared by every character), settings.json and leaderboard.json. Deleted slots move to saves\\deleted instead of vanishing.', 'השמירות הן קובצי JSON רגילים ליד קובץ ההפעלה בתיקייה ‎.\\saves‎: ‏slot_1.json עד slot_3.json, ‏global_vault.json (הכספת בת 100 המקומות המשותפת לכל הדמויות), ‏settings.json ו-leaderboard.json. משבצות שנמחקות עוברות ל-saves\\deleted במקום להיעלם.'),
+        L('Title screen and pause menu: Open Saves Folder (opens it in Explorer), Open Strategy Wiki (opens this site in your default browser; an offline copy ships with the game) and Quit to Desktop.', 'מסך הפתיחה ותפריט ההשהיה: פתיחת תיקיית השמירות (נפתחת בסייר הקבצים), פתיחת ויקי האסטרטגיה (האתר הזה נפתח בדפדפן ברירת המחדל; עותק לא-מקוון מצורף למשחק) ויציאה לשולחן העבודה.'),
+      ]);
+  }
+
+  function sectionFullDive() {
+    return h2(L('Full-Dive Combat', 'קרב Full-Dive')) +
+      h3(L('Input buffering & cancels', 'אגירת קלט וביטולים')) + list([
+        L('Every combat input (attack, skills 1-6, Q, Space, right-click parry, R) is remembered for 160ms and fires the instant it becomes legal - mash early and nothing is lost.', 'כל קלט קרב (התקפה, כישורים 1-6, ‏Q, רווח, הדיפה בקליק ימני, R) נשמר 160 אלפיות שנייה ומופעל ברגע שהוא חוקי - לחיצה מוקדמת לא הולכת לאיבוד.'),
+        L('Basic attack recovery (after the hit lands) can be cancelled into any Sword Skill (SKILL CONNECT!, +15%), a Dodge or a Perfect Parry.', 'את זמן ההתאוששות של התקפה בסיסית (אחרי שהמכה פוגעת) אפשר לבטל לכל כישור חרב (‏SKILL CONNECT!, ‏+15%), להתחמקות או להדיפה מושלמת.'),
+        L('A Sword Skill\'s 0.12s Pre-Motion and its recovery frames can be cancelled into a Dodge, a Perfect Parry or SWITCH!.', 'את 0.12 שניות ההכנה של כישור חרב ואת זמן ההתאוששות שלו אפשר לבטל להתחמקות, להדיפה מושלמת או ל-SWITCH!.'),
+      ]) +
+      h3(L('Kinetic stepping & Wall-Slam physics', 'צעדים קינטיים ופיזיקת הטחה בקיר')) + list([
+        L('Melee swings carry you forward with a 110-260 px/s micro-lunge (0.84 friction per frame) toward the cursor, stopping just short of the enemy so you never pass through it.', 'הנפות קרב מקרוב מזיזות אתכם קדימה בזינוק קטן של 110-260 פיקסלים לשנייה (חיכוך 0.84 לפריים) לעבר הסמן, ונעצרות ממש לפני האויב כך שלעולם לא עוברים דרכו.'),
+        L('Heavy finishers, shield bashes, spear sweeps, Charge Slams, OVERLOAD and SWITCH! chains hurl enemies. Hit a wall fast enough and you get WALL SLAM!: +45% of the hit as impact damage, a 1.5s stun and 30% of the Break Bar shattered.', 'מכות סיום כבדות, הלמות מגן, טאטואי חנית, הסתערות רכובה, ‏OVERLOAD ושרשראות SWITCH! מעיפים אויבים. אם הם נחבטים בקיר מהר מספיק מתקבל WALL SLAM!: ‏+45% מהמכה כנזק פגיעה, הלם של 1.5 שניות וניפוץ 30% ממד השבירה.'),
+        L('Battlefield props: Explosive Alchemical Barrels (fire blast that burns enemies and chain-detonates other barrels), Frost Crystal Clusters (freeze everything nearby for 2.5s), Crates and Urns (coins, potions, ores, rare treasure maps). Aether Jump Pads launch you onto plateaus.', 'אביזרי שדה קרב: חביות אלכימיות נפיצות (פיצוץ אש ששורף אויבים ומפוצץ חביות אחרות), אשכולות קריסטלי כפור (מקפיאים את כל הסביבה ל-2.5 שניות), ארגזים וכדים (מטבעות, שיקויים, עפרות ומפות אוצר נדירות). משטחי קפיצה של אתר משגרים אתכם אל הרמות.'),
+        L('Forgiving hitboxes: your attack arcs are 15% wider than the ribbons you see, your hurtbox is 20% tighter than your body, and any hit worth 12%+ of your max HP grants 0.35s of grace invulnerability.', 'תיבות פגיעה סלחניות: קשתות ההתקפה שלכם רחבות ב-15% מהסרטים שאתם רואים, אזור הפגיעה שלכם צר ב-20% מהגוף, וכל מכה ששווה 12% או יותר מהחיים המרביים מעניקה 0.35 שניות של חסינות חסד.'),
+      ]) +
+      h3(L('Skill Connect & the Finishing Nova', 'Skill Connect ונובת הסיום')) +
+      callout(L('When a Sword Skill\'s final strike lands, a 0.30s cyan star-ring flashes. Casting a different skill inside it cancels the recovery, costs 30% less MP and adds +25% damage per chain step. The fourth skill in a chain detonates a FINISHING NOVA (320% critical burst, Aether gauge, huge Break).', 'כשהמכה האחרונה של כישור חרב פוגעת, טבעת כוכב בצבע ציאן מהבהבת ל-0.30 שניות. הפעלת כישור אחר בתוכה מבטלת את ההתאוששות, עולה 30% פחות מאנה ומוסיפה ‎+25%‎ נזק לכל שלב בשרשרת. הכישור הרביעי בשרשרת מפוצץ נובת סיום (FINISHING NOVA: פיצוץ קריטי של 320%, מד אתר ושבירה עצומה).')) +
+      h3(L('Perfect Parry & Counter-Riposte', 'הדיפה מושלמת ותגובת-נגד')) +
+      callout(L('Block within 0.25s of an impact: 100% negation, a 50ms time-freeze, a ring shockwave that shoves nearby foes, 30% of your MP and Stamina restored and a massive Break chunk. Your next attack within 1.5s becomes a Counter-Riposte: a guaranteed 240% critical.', 'חסימה בתוך 0.25 שניות מהפגיעה: ביטול מוחלט של הנזק, הקפאת זמן של 50 אלפיות שנייה, גל הלם טבעתי שהודף אויבים קרובים, החזרת 30% מהמאנה והסיבולת ונתח ענק ממד השבירה. ההתקפה הבאה בתוך 1.5 שניות הופכת לתגובת-נגד: פגיעה קריטית מובטחת של 240%.'), 'gold') +
+      h3(L('Style meter: D to SSS', 'מד הסטייל: מ-D עד SSS')) +
+      p(L('Hits, crits, connects, parries, wall slams, reactions and kills raise your style rank (D, C, B, A, S, SS, SSS: FULL-DIVE OVERDRIVE!). Getting hit drops it; standing still lets it decay. Each rank adds attack speed (up to +25%), move speed (up to +15%) and Magic Find (up to +40%).', 'מכות, קריטיות, חיבורי כישורים, הדיפות, הטחות בקיר, תגובות והריגות מעלים את דרגת הסטייל (D, ‏C, ‏B, ‏A, ‏S, ‏SS, ‏SSS: FULL-DIVE OVERDRIVE!). ספיגת מכה מורידה אותה; עמידה במקום גורמת לה לדעוך. כל דרגה מוסיפה מהירות התקפה (עד ‎+25%‎), מהירות תנועה (עד ‎+15%‎) ומציאת קסם (עד ‎+40%‎).'));
+  }
+
+  var KEYSTONES_W = [
+    [L('Blade Ascendant', 'עליית הלהב'), BR.sword.name, L('Sword combo finishers launch a piercing crescent wave (80%). +15% crit damage.', 'מכות סיום של קומבו חרב משגרות גל סהר חודר (80%). ‎+15%‎ נזק קריטי.')],
+    [L('Thousand Cuts', 'אלף חתכים'), BR.dual.name, L('Every 10th hit within 3s triggers a free whirlwind flurry. +8% attack speed.', 'כל מכה עשירית בתוך 3 שניות מפעילה מערבולת חתכים חינם. ‎+8%‎ מהירות התקפה.')],
+    [L('Unbreakable Bastion', 'המבצר הבלתי שביר'), BR.shield.name, L('Perfect Parry window +0.08s and blocking costs half Stamina. +15% DEF.', 'חלון ההדיפה המושלמת ‎+0.08‎ שניות וחסימה עולה חצי סיבולת. ‎+15%‎ הגנה.')],
+    [L("Dragoon's Momentum", 'תנופת הדרגון'), BR.spear.name, L('Wall Slams trigger at lower speed and deal +90% impact damage. +3 Break.', 'הטחות בקיר מופעלות במהירות נמוכה יותר וגורמות ‎+90%‎ נזק פגיעה. ‎+3‎ שבירה.')],
+    [L('Deadeye Focus', 'מיקוד הצלף'), BR.bow.name, L('Your first hit on a full-HP enemy is always a critical. +8% crit chance.', 'המכה הראשונה שלכם באויב עם חיים מלאים תמיד קריטית. ‎+8%‎ סיכוי קריטי.')],
+    [L('Arcane Overflow', 'הצפה ארקנית'), BR.magic.name, L('Sword Skills cost 15% less MP. +40% MP regeneration and +8% skill damage.', 'כישורי חרב עולים 15% פחות מאנה. ‎+40%‎ התחדשות מאנה ו-‎+8%‎ נזק כישורים.')],
+  ];
+  var BRIDGES_W = [
+    [L("Duelist's Accord", 'ברית הדו-קרב'), L('Sword + Dual', 'חרב + כפולים'), L('+6% attack speed, +4% crit', '‎+6%‎ מהירות התקפה, ‎+4%‎ קריטי')],
+    [L('Wind Walker', 'הולך הרוח'), L('Dual + Bow', 'כפולים + קשת'), L('+6% move speed, +12% crit damage', '‎+6%‎ מהירות תנועה, ‎+12%‎ נזק קריטי')],
+    [L('Arcane Archer', 'קשת ארקני'), L('Bow + Magic', 'קשת + קסם'), L('+8% ATK, +8% MAG', '‎+8%‎ התקפה, ‎+8%‎ קסם')],
+    [L('Runeguard', 'שומר הרונות'), L('Magic + Shield', 'קסם + מגן'), L('+10% DEF, +30 MP, +20% MP regen', '‎+10%‎ הגנה, ‎+30‎ מאנה, ‎+20%‎ התחדשות מאנה')],
+    [L('Phalanx Doctrine', 'תורת הפלנקס'), L('Shield + Spear', 'מגן + חנית'), L('+8% DEF, +4 Break', '‎+8%‎ הגנה, ‎+4‎ שבירה')],
+    [L("Lancer's Edge", 'להב הרומח'), L('Spear + Sword', 'חנית + חרב'), L('+8% ATK, +6% skill damage', '‎+8%‎ התקפה, ‎+6%‎ נזק כישורים')],
+  ];
+
+  function sectionConstellation() {
+    return h2(L('Constellation Skill Graph (K)', 'גרף הכישורים הכוכבי (K)')) +
+      p(L('Press K for a pan-and-zoom star map: six sector constellations (one per branch) holding 30 active Sword Skills, 18 passives, 6 Keystones and 6 cross-branch Hybrid Bridges.', 'לחצו K למפת כוכבים עם הזזה וזום: שש קונסטלציות (אחת לכל ענף) עם 30 כישורי חרב פעילים, 18 פסיביים, 6 אבני-מפתח ו-6 גשרים היברידיים בין ענפים.')) +
+      h3(L('Skill ranks 1-5', 'דרגות כישור 1-5')) +
+      p(L('Every learned Sword Skill can be ranked up to 5. Each rank adds +12% damage and -5% cooldown. Rank r to r+1 costs r+1 SP and needs branch Mastery equal to the skill\'s unlock rank + 3r.', 'כל כישור חרב שנלמד ניתן לשדרג עד דרגה 5. כל דרגה מוסיפה ‎+12%‎ נזק ו-‎-5%‎ זמן המתנה. מעבר מדרגה r ל-r+1 עולה r+1 נקודות כישור ודורש שליטה בענף השווה לדרגת הפתיחה של הכישור ועוד 3r.')) +
+      h3(L('Rune Morphs (unlock at skill rank 3, pick one of three)', 'מורפים רוניים (נפתחים בדרגה 3, בחרו אחד משלושה)')) +
+      table([L('Rune', 'רונה'), L('Effect', 'אפקט')], [
+        [L('Execution / Power', 'הוצאה להורג / עוצמה'), L('x1.35 damage, +15% area, +50% damage to enemies below 30% HP. Example: "Gale Lunge: Executioner".', 'פי 1.35 נזק, ‎+15%‎ שטח, ‎+50%‎ נזק לאויבים מתחת ל-30% חיים. לדוגמה: "Gale Lunge: Executioner".')],
+        [L('Shadow-Clone / Mobility', 'שיבוט צל / ניידות'), L('A violet shadow clone repeats every hit 0.25s later for 40%, plus an evasive hop after the skill. Example: "Twin Cyclone: Phantom Echo".', 'שיבוט צל סגול חוזר על כל מכה כעבור 0.25 שניות ב-40%, ועוד קפיצת התחמקות אחרי הכישור. לדוגמה: "Twin Cyclone: Phantom Echo".')],
+        [L('Elemental Conversion / Leech', 'המרה יסודית / יניקה'), L('Converts the skill to the branch element (Sword: Frost, Dual: Venom, Shield: Shock, Spear: Burn, Bow: Bleed, Magic: Aether), paints its reaction gauge and heals 8% of damage dealt.', 'ממיר את הכישור ליסוד הענף (חרב: כפור, כפולים: ארס, מגן: הלם חשמלי, חנית: בעירה, קשת: דימום, קסם: אתר), צובע את מד התגובה שלו ומרפא 8% מהנזק.')],
+      ]) + p(L('30 skills x 3 runes = 90 named variations, each with its own geometry, colour and effect.', '30 כישורים × 3 רונות = 90 וריאציות עם שם, כל אחת עם צורה, צבע ואפקט משלה.')) +
+      h3(L('Keystones (branch Mastery 15, 3 SP)', 'אבני-מפתח (שליטה 15 בענף, 3 נקודות)')) +
+      table([L('Keystone', 'אבן-מפתח'), L('Branch', 'ענף'), L('Effect', 'אפקט')], KEYSTONES_W) +
+      h3(L('Hybrid Bridges (Mastery 10 in both branches, 2 SP)', 'גשרים היברידיים (שליטה 10 בשני הענפים, 2 נקודות)')) +
+      table([L('Bridge', 'גשר'), L('Branches', 'ענפים'), L('Bonus', 'בונוס')], BRIDGES_W);
+  }
+
+  function sectionReactions() {
+    return h2(L('Elemental Reactions', 'תגובות יסודיות')) +
+      p(L('Elemental hits paint a reaction gauge (a coloured diamond above the enemy) for 4.5s. Painting a second gauge detonates a reaction and consumes both. Gauges come from skill elements, gems, blade oils, Elemental Runes, pets, set and unique powers - and melee criticals cause Bleed.', 'מכות יסודיות צובעות מד תגובה (יהלום צבעוני מעל האויב) ל-4.5 שניות. צביעת מד שני מפוצצת תגובה וצורכת את שניהם. מדים מגיעים מיסודות הכישורים, אבני חן, שמני להב, רונות יסודיות, חיות מחמד, כוחות סטים וייחודיים - ופגיעות קריטיות מקרוב גורמות לדימום.')) +
+      table([L('Gauge', 'מד'), L('Source elements', 'יסודות מקור')], [
+        [L('Burn', 'בעירה'), L('Fire', 'אש')], [L('Frost', 'כפור'), L('Frost', 'כפור')], [L('Shock', 'הלם חשמלי'), L('Lightning', 'ברק')],
+        [L('Bleed', 'דימום'), L('Wind, melee criticals', 'רוח, פגיעות קריטיות מקרוב')], [L('Venom', 'ארס'), L('Poison', 'רעל')], [L('Aether', 'אתר'), L('Void, Holy', 'ריק, קדושה')],
+      ]) +
+      table([L('Reaction', 'תגובה'), L('Recipe', 'מתכון'), L('Effect', 'אפקט')], [
+        ['MELT', L('Burn + Frost', 'בעירה + כפור'), L('The hit detonates for a 2.2x elemental burst.', 'המכה מתפוצצת לפרץ יסודי של פי 2.2.')],
+        ['SHATTER', L('Frost + Bleed', 'כפור + דימום'), L('Ice shrapnel hits everything nearby and shatters 35% of the Break Bar.', 'רסיסי קרח פוגעים בכל הסביבה ומנפצים 35% ממד השבירה.')],
+        ['OVERLOAD', L('Burn + Shock', 'בעירה + הלם'), L('A plasma blast deals area damage and hurls enemies outward (Wall-Slam fuel!).', 'פיצוץ פלזמה גורם נזק אזורי ומעיף אויבים החוצה (דלק להטחה בקיר!).')],
+        ['SUPERCONDUCT', L('Frost + Shock', 'כפור + הלם'), L('Armor collapses: -40% DEF for 8 seconds.', 'השריון קורס: ‎-40%‎ הגנה ל-8 שניות.')],
+        ['TEMPEST SPREAD', L('Venom + any', 'ארס + כל מד'), L('Every status and gauge on the target spreads to enemies within 150 units.', 'כל מצב ומד על המטרה מתפשטים לאויבים ברדיוס 150.')],
+        ['AETHER SINGULARITY', L('Aether + any', 'אתר + כל מד'), L('A gravity vortex drags enemies together and crushes them for 2.4s.', 'מערבולת כבידה גוררת אויבים יחד ומועכת אותם למשך 2.4 שניות.')],
+      ]);
+  }
+
+  var UNIQUES_W = [
+    [L('Nightfall Sovereign', 'ריבון רדת הלילה'), L('Longsword', 'חרב ארוכה'), L('Every 3rd Skill Connect summons a Shadow Doppelganger that repeats your skill for 60% damage.', 'כל Skill Connect שלישי מזמן כפיל צל שחוזר על הכישור ב-60% נזק.')],
+    [L('Rimecrest Blade', 'להב פסגת הכפור'), L('Longsword', 'חרב ארוכה'), L('Critical hits unleash a piercing Frost Nova (60%, Frost gauge). SHATTER +50%.', 'פגיעות קריטיות משחררות נובת כפור חודרת (60%, מד כפור). ‏SHATTER ‏‎+50%‎.')],
+    [L('Dawnspark Edge', 'להב ניצוץ השחר'), L('Twin Edge', 'להב תאום'), L('Attack speed also shortens Sword Skill cooldowns; dodging leaves a damaging lance of light.', 'מהירות התקפה מקצרת גם את זמני ההמתנה; התחמקות משאירה רומח אור פוגע.')],
+    [L('Verdict of the Ivory Aegis', 'פסק דין אגיס השנהב'), L('Shield', 'מגן'), L('Perfect Parries fire a Divine Judgment beam (250%) and grant a 25% max HP barrier.', 'הדיפות מושלמות יורות קרן משפט אלוהי (250%) ומעניקות מחסום של 25% מהחיים.')],
+    [L('Astral Dragonbone Spear', 'חנית עצם הדרקון האסטרלית'), L('Spear', 'חנית'), L('Wall Slams and Breaks call down a draconic meteor (200% fire); thrusts reach 30% further.', 'הטחות בקיר ושבירות מורידות מטאור דרקוני (200% אש); דקירות מגיעות רחוק ב-30%.')],
+    [L('Phoenix Longbow', 'קשת עוף החול'), L('Longbow', 'קשת ארוכה'), L('Arrows ignite; burning enemies explode in phoenix fire; once per 120s lethal damage revives you at 40% HP.', 'החצים מציתים; אויבים בוערים מתפוצצים באש עוף החול; פעם ב-120 שניות נזק קטלני מחייה אתכם ב-40% חיים.')],
+    [L('Aetherion Arch-Staff', 'מטה הקשת של אתריון'), L('Arcane Staff', 'מטה ארקני'), L('Spells arc to 2 extra enemies for 40%; every 5th spell is free.', 'לחשים מקפצים לשני אויבים נוספים ב-40%; כל לחש חמישי בחינם.')],
+  ];
+  var SETS_W = [
+    [L('Nightfall Duelist', 'דו-קרבן רדת הלילה'), L('+6% aspd, +4% crit', '‎+6%‎ מהירות, ‎+4%‎ קריטי'), L('+25% crit dmg, +10% skill dmg', '‎+25%‎ נזק קריטי, ‎+10%‎ נזק כישורים'), L('Skill Connect costs no MP, +10% per chain step', 'Skill Connect בלי מאנה, ‎+10%‎ לכל שלב')],
+    [L('Ivory Aegis Paladin', 'פלדין אגיס השנהב'), L('+10% DEF, +5% block', '‎+10%‎ הגנה, ‎+5%‎ חסימה'), L('+12% HP, +20% MP regen', '‎+12%‎ חיים, ‎+20%‎ התחדשות מאנה'), L('Blocking heals 2%; Perfect Parry heals 10%', 'חסימה מרפאת 2%; הדיפה מושלמת מרפאת 10%')],
+    [L('Sylvan Windrunner', 'רץ הרוח היערי'), L('+6% move, +3% crit', '‎+6%‎ תנועה, ‎+3%‎ קריטי'), L('+12% ATK, +6% aspd', '‎+12%‎ התקפה, ‎+6%‎ מהירות'), L('Dodging fires 3 homing wind arrows', 'התחמקות יורה 3 חיצי רוח מתבייתים')],
+    [L('Pyrehold Dragonlord', 'אדון הדרקונים של פיירהולד'), L('+8% ATK, +3 Break', '‎+8%‎ התקפה, ‎+3‎ שבירה'), L('+10% HP, +20% crit dmg', '‎+10%‎ חיים, ‎+20%‎ נזק קריטי'), L('Every hit applies Burn; MELT and OVERLOAD +60%', 'כל מכה מוסיפה בעירה; ‏MELT ו-OVERLOAD ‏‎+60%‎')],
+    [L('Frostspire Valkyrie', 'ולקירית צריח הכפור'), L('+5% crit', '‎+5%‎ קריטי'), L('+30% crit dmg, +4% move', '‎+30%‎ נזק קריטי, ‎+4%‎ תנועה'), L('Crits apply Frost; SHATTER +80%', 'קריטיות מוסיפות כפור; ‏SHATTER ‏‎+80%‎')],
+    [L('Aetherial Archmage', 'הארכימאג האתרי'), L('+10% MAG, +30 MP', '‎+10%‎ קסם, ‎+30‎ מאנה'), L('+40% MP regen, +12% skill dmg', '‎+40%‎ התחדשות מאנה, ‎+12%‎ נזק כישורים'), L('Skills cost 30% less MP and apply Aether', 'כישורים עולים 30% פחות מאנה ומוסיפים אתר')],
+    [L('Gilded Anvil Artisan', 'אומן הסדן המוזהב'), L('+4 Break, +6 DEF', '‎+4‎ שבירה, ‎+6‎ הגנה'), L('+8% ATK, +8% DEF', '‎+8%‎ התקפה, ‎+8%‎ הגנה'), L('+15% tempering, +25% gathering, +20% Break', '‎+15%‎ חישול, ‎+25%‎ איסוף, ‎+20%‎ שבירה')],
+    [L('Abyssal Sovereign', 'ריבון התהום'), L('+8% HP, +2% lifesteal', '‎+8%‎ חיים, ‎+2%‎ גניבת חיים'), L('+10% ATK, +10% MAG', '‎+10%‎ התקפה, ‎+10%‎ קסם'), L('Below 50% HP: +30% damage, 6% lifesteal', 'מתחת ל-50% חיים: ‎+30%‎ נזק, 6% גניבת חיים')],
+  ];
+  var POWERS_W = [
+    [L('Sanguine Edge', 'להב הדם'), L('Weapon', 'נשק'), L('Heal 5% of all damage dealt', 'ריפוי 5% מכל הנזק')],
+    [L('Stormcaller', 'קורא הסערה'), L('Weapon', 'נשק'), L('Crits call lightning (60%, Shock)', 'קריטיות מזמנות ברק (60%, הלם)')],
+    [L('Echo Strike', 'מכת הד'), L('Weapon', 'נשק'), L('15% chance basic attacks strike twice', '15% סיכוי שהתקפה בסיסית תכה פעמיים')],
+    [L("Executioner's Verdict", 'פסק התליין'), L('Weapon', 'נשק'), L('+40% damage below 30% enemy HP', '‎+40%‎ נזק לאויב מתחת ל-30% חיים')],
+    [L('Arcane Surge', 'נחשול ארקני'), L('Weapon', 'נשק'), L('Skill hits restore 2 MP', 'פגיעות כישור מחזירות 2 מאנה')],
+    [L('Thornmail', 'שריון קוצים'), L('Armor', 'שריון'), L('Reflect 20% of melee damage', 'החזרת 20% מנזק קרוב')],
+    [L('Bulwark Sigil', 'חותם המעוז'), L('Armor', 'שריון'), L('+8% block, +15% DEF', '‎+8%‎ חסימה, ‎+15%‎ הגנה')],
+    [L('Second Wind', 'רוח שנייה'), L('Armor', 'שריון'), L('Below 30% HP heal 25% (90s)', 'מתחת ל-30% חיים ריפוי 25% (90 שנ\')')],
+    [L('Featherstep', 'צעד נוצה'), L('Armor', 'שריון'), L('Cheaper dodges, +30% speed burst', 'התחמקויות זולות, פרץ מהירות ‎+30%‎')],
+    [L('Midas Touch', 'מגע מידאס'), L('Utility', 'תועלת'), L('+30% gold', '‎+30%‎ זהב')],
+    [L("Scholar's Insight", 'תובנת המלומד'), L('Utility', 'תועלת'), L('+15% XP', '‎+15%‎ ניסיון')],
+    [L('Pathfinder', 'מוצא הדרך'), L('Utility', 'תועלת'), L('+10% move speed', '‎+10%‎ מהירות תנועה')],
+    [L("Fortune's Favor", 'חסד המזל'), L('Utility', 'תועלת'), L('+25% Magic Find', '‎+25%‎ מציאת קסם')],
+    [L('Showstopper', 'עוצר ההצגה'), L('Utility', 'תועלת'), L('Style decays 40% slower, never below C in combat', 'הסטייל דועך לאט ב-40%, לעולם לא מתחת ל-C בקרב')],
+  ];
+
+  function sectionGear() {
+    return h2(L('Uniques, Sets & the Relic Codex', 'ייחודיים, סטים וקודקס השרידים')) +
+      h3(L('Affixes & the Arcane Enchanter', 'תכונות והמכשף הארקני')) +
+      p(L('Uncommon gear rolls 1 affix, Rare 2, Epic 3, Legendary 3 plus a golden power, Mythic 4 plus a golden power (ATK/MAG/DEF/HP flat or %, crit, crit damage, attack and move speed, Break, MP regen, lifesteal, skill damage, cooldown reduction, Magic Find, XP). The Arcane Enchanter tab at any Master Forge rerolls one affix for gold and Arcane Dust.', 'ציוד לא-שכיח מקבל תכונה אחת, נדיר 2, אפי 3, אגדי 3 ועוד כוח זהוב, מיתי 4 ועוד כוח זהוב (התקפה/קסם/הגנה/חיים קבועים או באחוזים, קריטי, נזק קריטי, מהירות התקפה ותנועה, שבירה, התחדשות מאנה, גניבת חיים, נזק כישורים, קיצור זמני המתנה, מציאת קסם וניסיון). לשונית המכשף הארקני בכל נפחייה ראשית מגרילה מחדש תכונה אחת תמורת זהב ואבקה ארקנית.')) +
+      h3(L('Unique weapons (golden modifiers)', 'נשקים ייחודיים (משנים זהובים)')) +
+      table([L('Unique', 'ייחודי'), L('Type', 'סוג'), L('Golden power', 'כוח זהוב')], UNIQUES_W) +
+      p(L('Uniques drop from realm bosses (10%), Abyss bosses past floor 15 (18%), roaming raid bosses (45%), treasure chests and the Black Market.', 'ייחודיים נופלים מבוסי ממלכות (10%), בוסי תהום אחרי קומה 15 (18%), בוסי פשיטה נודדים (45%), תיבות אוצר והשוק השחור.')) +
+      h3(L('Armor sets (2 / 4 / 6 pieces)', 'סטים של שריון (2 / 4 / 6 חלקים)')) +
+      table([L('Set', 'סט'), '2', '4', '6'], SETS_W) +
+      p(L('Set pieces are Epic or better drops (30% of Epic+ from elites and bosses). A two-handed set weapon counts as two pieces.', 'חלקי סט הם שלל אפי ומעלה (30% מהאפי ומעלה של עילית ובוסים). נשק סט דו-ידני נחשב לשני חלקים.')) +
+      h3(L('Aether Relic Codex', 'קודקס שרידי האתר')) +
+      p(L('At a Master Forge (Relic Codex tab) extract the golden power of a Legendary / Mythic item or a unique (the item is consumed; costs gold and 2 Arcane Dust). Equip up to three relic powers - one weapon, one armor, one utility - on top of whatever gear you wear. Press U to review your Codex anywhere.', 'בנפחייה ראשית (לשונית קודקס השרידים) חלצו את הכוח הזהוב של פריט אגדי / מיתי או ייחודי (הפריט נצרך; עולה זהב ו-2 אבקה ארקנית). ציידו עד שלושה כוחות שרידים - נשק, שריון ותועלת - מעל כל ציוד שאתם לובשים. לחצו U לצפייה בקודקס מכל מקום.')) +
+      table([L('Legendary power', 'כוח אגדי'), L('Slot', 'משבצת'), L('Effect', 'אפקט')], POWERS_W) +
+      h3(L('Loot quality of life', 'נוחות שלל')) + list([
+        L('Loot beams by rarity plus harmonic drop chords that grow richer from Rare to Mythic.', 'קרני שלל לפי נדירות ואקורדי נפילה הרמוניים שמתעשרים מנדיר ועד מיתי.'),
+        L('Side-by-side comparison tooltips: the equipped piece next to the hovered one with every stat difference.', 'חלוניות השוואה זו לצד זו: הפריט המצויד ליד הפריט המסומן עם כל הפרשי הנתונים.'),
+        L('Smart Auto-Salvage (Character > Inventory): Common and Uncommon drops become ingots and Arcane Dust automatically.', 'פירוק אוטומטי חכם (דמות > מלאי): שלל שכיח ולא-שכיח הופך אוטומטית למטילים ואבקה ארקנית.'),
+        L('Cosmetic Wardrobe (T): every look you have ever owned is saved; transmog any slot and recolor armor with 16 dyes (150 G each). Stats never change.', 'ארון בגדים קוסמטי (T): כל מראה שהיה לכם אי פעם נשמר; החליפו מראה לכל משבצת וצבעו שריון ב-16 צבעים (150 זהב כל אחד). הנתונים לעולם לא משתנים.'),
+      ]);
+  }
+
+  function sectionLiving() {
+    return h2(L('Party, Raids & Adventurers', 'חבורה, פשיטות והרפתקנים')) +
+      h3(L('Party of two & the Tactical Gambit Bar', 'חבורה של שניים וסרגל הגמביטים הטקטיים')) + list([
+        L('Recruit companions at their Guild Hall and summon up to two at once (Character > Companions).', 'גייסו בני לוויה באולם הגילדה שלהם וזמנו עד שניים בבת אחת (דמות > בני לוויה).'),
+        L('F1 Assault (free targeting, aggressive skills), F2 Guard & Peel (stay close, hit whatever attacks you), F3 Focus My Target (attack your last target), F4 Support & Heal (keep distance, heals and barriers first).', 'F1 הסתערות (בחירת מטרות חופשית, כישורים תוקפניים), F2 שמירה וחילוץ (הישארות קרובה ותקיפת מי שתוקף אתכם), F3 התמקדות במטרה שלי (תקיפת המטרה האחרונה שלכם), F4 תמיכה וריפוי (שמירת מרחק, ריפוי ומחסומים קודם).'),
+        L('Affinity grows with every shared kill: Acquaintance, Comrade, Trusted Ally, Sworn Partner, Soulbound (+3% companion stats per rank).', 'הזיקה גדלה עם כל הריגה משותפת: מכר, עמית, בן ברית נאמן, שותף מושבע, קשורי-נשמה (‎+3%‎ לנתוני בן הלוויה בכל דרגה).'),
+        L('With two companions, SWITCH! (R) becomes a TRIPLE SWITCH!: both partners chain their Synchronized Chain Skills back to back.', 'עם שני בני לוויה, SWITCH! ‏(R) הופך ל-TRIPLE SWITCH!: שני השותפים משרשרים את כישורי השרשרת המסונכרנים שלהם בזה אחר זה.'),
+      ]) +
+      h3(L('Assault Team Raid Briefing & 6-hero raids', 'תדריך צוות התקיפה ופשיטות של 6 גיבורים')) +
+      p(L('Before a realm boss, or when you approach a roaming raid boss, the Raid Briefing lets you deploy three Ivory Aegis Vanguard knights (Sir Aldric Vane, Dame Liora Ashcroft, Captain Hesper Kell). You, two companions and the Vanguard make a six-hero Assault Team that shares aggro.', 'לפני בוס ממלכה, או כשמתקרבים לבוס פשיטה נודד, תדריך הפשיטה מאפשר להציב שלושה אבירי חלוץ של אגיס השנהב (סר אלדריק וייין, הגברת ליורה אשקרופט, קפטן הספר קל). אתם, שני בני לוויה והחלוץ יוצרים צוות תקיפה של שישה גיבורים שחולקים את תשומת לב האויב.')) +
+      table([L('Roaming raid boss', 'בוס פשיטה נודד'), L('Style', 'סגנון')], [
+        [L('Colossus of the Sundered Gate', 'ענק השער המבותק'), L('Gate-stone titan: earthquake slams, boulder rain, quake rings, a charging dash. Appears at night in the wilds.', 'טיטאן מאבני שער: חבטות רעידת אדמה, גשם סלעים, טבעות רעש וזינוק הסתערות. מופיע בלילה בשטחי הבר.')],
+        [L('The Hollow Reaper', 'הקוצר החלול'), L('Skeletal harvester: wide scythe sweeps, triple reaping lines, shadow-phase blinks, gravity vortexes.', 'קוצר שלדי: טאטואי מגל רחבים, שלושה קווי קציר, השתגרויות צל ומערבולות כבידה.')],
+      ]) +
+      h3(L('Simulated adventurers', 'הרפתקנים מדומים')) + list([
+        L('Named AI Divers roam cities and the wilds: they wander, gather, chat and fight monsters with real weapons and skills.', 'צוללים ממוחשבים עם שמות מסתובבים בערים ובשטחי הבר: משוטטים, אוספים, משוחחים ונלחמים במפלצות עם נשקים וכישורים אמיתיים.'),
+        L('An orange "!" means they are under attack: defeat their attackers while staying close for a reward chest and guild reputation.', '"!" כתום פירושו שהם מותקפים: הביסו את התוקפים כשאתם בקרבת מקום וקבלו תיבת פרס ומוניטין בגילדה.'),
+        L('Talk to them (E) to buy a rare material, swap materials, or start a friendly 1v1 duel: a 3-2-1 countdown, and the first to fall below 10% HP yields. Nobody dies in a duel.', 'דברו איתם (E) כדי לקנות חומר נדיר, להחליף חומרים או לפתוח דו-קרב ידידותי 1 על 1: ספירה לאחור 3-2-1, והראשון שיורד מתחת ל-10% חיים נכנע. אף אחד לא מת בדו-קרב.'),
+      ]);
+  }
+
+  var MOUNTS_W = [
+    [L('Dun Courser', 'סוס הדהור החום'), '8', '1,800'], [L('Frostfang Wolf', 'זאב ניב הכפור'), '18', '4,200'], [L('Starlight Stag', 'אייל אור הכוכבים'), '28', '7,500'],
+    [L('Ember Drake', 'דרייק הגחלים'), '38', '12,000'], [L('Aether Gryphon', 'גריפון האתר'), '48', '20,000'],
+  ];
+  var PETS_W = [
+    [L('Ember Sprite', 'פיית הגחלים'), L('Burn', 'בעירה'), '600'], [L('Frost Wisp', 'רוח הכפור'), L('Frost', 'כפור'), '900'], [L('Spark Kit', 'גור הניצוצות'), L('Shock', 'הלם'), '1,500'],
+    [L('Gale Finch', 'פרוש הסערה'), L('Bleed', 'דימום'), '2,400'], [L('Bloom Sprout', 'נבט הפריחה'), L('Venom', 'ארס'), '3,600'], [L('Void Moth', 'עש הריק'), L('Aether', 'אתר'), '6,000'],
+  ];
+
+  function sectionWorld3() {
+    return h2(L('Mounts, Pets, Fishing & World Events', 'רכיבה, חיות מחמד, דיג ואירועי עולם')) +
+      h3(L('Mounts (V)', 'רכיבה (V)')) +
+      p(L('Buy mounts at the Stable & Pet Sanctuary in any city (or press P anywhere to choose). Press V to ride in cities and the wilds: +65% move speed. Attacking while mounted performs a Mounted Charge Slam - a gallop that ends in a 190% knockback shockwave - and dismounts you. Heavy hits knock you off.', 'קנו בהמות רכיבה באורווה ובמקדש חיות המחמד בכל עיר (או לחצו P בכל מקום כדי לבחור). לחצו V כדי לרכוב בערים ובשטחי הבר: ‎+65%‎ מהירות תנועה. תקיפה בזמן רכיבה מבצעת הסתערות רכובה - דהירה שמסתיימת בגל הדף של 190% - ומורידה אתכם מהבהמה. מכות כבדות מפילות אתכם.')) +
+      table([L('Mount', 'בהמה'), L('Level', 'רמה'), L('Gold', 'זהב')], MOUNTS_W) +
+      h3(L('Combat pets', 'חיות מחמד לוחמות')) +
+      p(L('Pets float beside you, vacuum up loot crystals from far away and fire a support bolt every 2.2s that paints their element\'s reaction gauge - perfect for setting up MELT or SINGULARITY.', 'חיות המחמד מרחפות לצדכם, שואבות גבישי שלל ממרחק רב ויורות בכל 2.2 שניות קליע תמיכה שצובע את מד התגובה של היסוד שלהן - מושלם להכנת MELT או SINGULARITY.')) +
+      table([L('Pet', 'חיית מחמד'), L('Gauge', 'מד'), L('Gold', 'זהב')], PETS_W) +
+      h3(L('Tension-bar fishing', 'דיג עם מד מתח')) +
+      p(L('Every wild map has fishing spots (bobbing red floats on the shore). Press E, then hold Space or the mouse button to lift the green catch zone and keep the fish inside it until the bar fills. Each realm has its own catch, up to the Legendary Ancient Root-Eel and the Mythic Starwhale Calf. Fish cook into the Angler\'s Platter (+12% Magic Find).', 'בכל מפת בר יש נקודות דיג (מצופים אדומים על החוף). לחצו E ואז החזיקו רווח או את כפתור העכבר כדי להרים את אזור התפיסה הירוק ולהשאיר את הדג בתוכו עד שהמד מתמלא. לכל ממלכה שלל משלה, עד צלופח השורש העתיק האגדי וגור לוויתן הכוכבים המיתי. הדגים מתבשלים למגש הדייג (‎+12%‎ מציאת קסם).')) +
+      h3(L('Terrain', 'פני השטח')) +
+      p(L('Wild maps now have two-tier plateaus with oblique rock faces, carved stone stairs and Aether Jump Pads, rivers with wooden bridges and walkable shallows, swaying grass that bends around you, footprints in snow and ripples in water, sun and moon shadows that follow the clock, drifting cloud shadows and god-rays in forests and ruins.', 'במפות הבר יש עכשיו רמות דו-מפלסיות עם צוקי סלע אלכסוניים, מדרגות אבן חצובות ומשטחי קפיצה של אתר, נהרות עם גשרי עץ ומים רדודים שאפשר ללכת בהם, דשא מתנועע שמתכופף סביבכם, עקבות בשלג ואדוות במים, צללי שמש וירח שעוקבים אחרי השעון, צללי עננים נודדים וקרני אור ביערות ובחורבות.')) +
+      h3(L('Treasure maps, events & the Black Market', 'מפות אוצר, אירועים והשוק השחור')) + list([
+        L('Ancient Treasure Maps drop from elites, bosses, crates and events. Use one to mark a gold X on a wild map; stand on it and press E to dig up a chest (12% unique, 45% set piece).', 'מפות אוצר עתיקות נופלות מעילית, בוסים, ארגזים ואירועים. השתמשו באחת כדי לסמן X זהוב במפת בר; עמדו עליו ולחצו E כדי לחפור תיבה (12% ייחודי, 45% חלק סט).'),
+        L('Corrupted Gate Outbreak: a purple gate spews waves of monsters until you destroy it. Reward chest with a treasure map.', 'התפרצות שער מושחת: שער סגול פולט גלי מפלצות עד שתהרסו אותו. תיבת פרס עם מפת אוצר.'),
+        L('Caravan Escort: a merchant wagon only moves while you stay close; ambushes target it. Bring it home to unlock the hooded Black-Market Vendor in every city, who sells uniques, set pieces, relic shards, Mythic Cores and treasure maps (stock rotates daily).', 'ליווי שיירה: עגלת סוחרים זזה רק כשאתם בקרבתה; מארבים מכוונים אליה. הביאו אותה ליעדה כדי לפתוח את סוחר השוק השחור בברדס בכל עיר, שמוכר ייחודיים, חלקי סט, רסיסי שרידים, ליבות מיתיות ומפות אוצר (המלאי מתחלף מדי יום).'),
+      ]);
+  }
+
+  function sectionJournal() {
+    var groups = [
+      [L('Combat', 'קרב'), L('First Blood, Monster Hunter, Thousand-Slayer, Steel Reflexes, Iron Wall, Counter-Riposte, Skill Connect!, Finishing Nova, Combo Architect, Wall Slam!, Wallbreaker, Elemental Novice, Elementalist, Full-Dive Overdrive, Collateral Damage, Cavalry Charge', 'דם ראשון, צייד מפלצות, קוטל האלף, רפלקסי פלדה, חומת ברזל, תגובת-נגד, Skill Connect!, נובת סיום, אדריכל הקומבו, הטחה בקיר!, שובר הקירות, טירון היסודות, אמן היסודות, Full-Dive Overdrive, נזק נלווה, הסתערות פרשים')],
+      [L('Legends', 'אגדות'), L('Tower Breaker, Root Cutter, Wyrmslayer, Winter Ends, Paragon\'s Bane, Gatebreaker, Reaper Reaped, Into the Abyss, Abyss Walker, Bottomless, Grand Champion, Aetheria Legend', 'שובר המגדל, קוצץ השורש, קוטל התולעת, סוף החורף, מכת הפרגון, שובר השער, הקוצר נקצר, אל התהום, הולך התהום, ללא תחתית, האלוף הגדול, אגדת אתריה')],
+      [L('Crafting & items', 'יצירה ופריטים'), L('Apprentice Smith, Masterwork, Master Smith, Living Legend, Touched by Myth, Full Regalia, Relic Scholar, Codex Keeper, Kitchen & Cauldron', 'נפח מתלמד, יצירת מופת, נפח אמן, אגדה חיה, נגיעת המיתוס, מלכות מלאה, מלומד השרידים, שומר הקודקס, מטבח וקדרה')],
+      [L('Party & world', 'חבורה ועולם'), L('Full Party, Soulbound, Triple SWITCH!, Assault Team, Good Samaritan, Duelist, Barterer, Saddle Up, Stablemaster, Best Friend, First Catch, Angler, The One That Did Not Get Away, X Marks the Spot, Gatekeeper, Escort Duty, Homeowner, Seasoned Diver, Naturalist', 'חבורה מלאה, קשורי-נשמה, Triple SWITCH!, צוות תקיפה, השומרוני הטוב, דו-קרבן, סוחר חליפין, לעלות לאוכף, אדון האורווה, חבר הכי טוב, דג ראשון, דייג, זה שלא ברח, X מסמן את המקום, שומר השער, משמר שיירה, בעל בית, צולל ותיק, חוקר הטבע')],
+    ];
+    return h2(L('Journal, Titles & Bestiary', 'יומן, תארים ובסטיאריום')) +
+      p(L('Press N for the Journal: 56 achievements in five categories. Many grant titles (Fledgling Diver, Thousand-Slayer, the Iron Wall, Chain Virtuoso, Wallbreaker, the Elementalist, Full-Diver, Wyrmslayer, Paragon\'s Bane, Gatebreaker, Reaper-Bane, Abyss Walker, the Bottomless, Grand Champion, Master Smith, the Regal, the Soulbound, the Duelist, Stablemaster, the Angler, the Naturalist, Legend of Aetheria) that float above your head.', 'לחצו N ליומן: 56 הישגים בחמש קטגוריות. רבים מעניקים תארים (Fledgling Diver, ‏Thousand-Slayer, ‏the Iron Wall, ‏Chain Virtuoso, ‏Wallbreaker, ‏the Elementalist, ‏Full-Diver, ‏Wyrmslayer, ‏Paragon\'s Bane, ‏Gatebreaker, ‏Reaper-Bane, ‏Abyss Walker, ‏the Bottomless, ‏Grand Champion, ‏Master Smith, ‏the Regal, ‏the Soulbound, ‏the Duelist, ‏Stablemaster, ‏the Angler, ‏the Naturalist, ‏Legend of Aetheria) שמרחפים מעל ראשכם.')) +
+      table([L('Category', 'קטגוריה'), L('Achievements', 'הישגים')], groups) +
+      h3(L('Bestiary (O)', 'בסטיאריום (O)')) +
+      p(L('Every creature you defeat is recorded with a live, rotating 3D-oblique model, its attacks, element, weaknesses, drops and your kill count.', 'כל יצור שאתם מביסים נרשם עם מודל חי ומסתובב במבט אלכסוני תלת-ממדי, ההתקפות שלו, היסוד, החולשות, השלל ומספר ההריגות שלכם.'));
+  }
+
   var SECTIONS = [
     { id: 'home', title: L('Home', 'דף הבית'), render: sectionHome },
+    { id: 'desktop', title: L('Desktop App', 'אפליקציית המחשב'), render: sectionDesktop },
     { id: 'combat', title: L('Controls & Combat', 'שליטה וקרב'), render: sectionCombat },
+    { id: 'fulldive', title: L('Full-Dive Combat', 'קרב Full-Dive'), render: sectionFullDive },
     { id: 'skills', title: L('Skill Tree', 'עץ הכישורים'), render: sectionSkills },
+    { id: 'constellation', title: L('Constellation & Morphs', 'קונסטלציה ומורפים'), render: sectionConstellation },
+    { id: 'reactions', title: L('Elemental Reactions', 'תגובות יסודיות'), render: sectionReactions },
+    { id: 'gear', title: L('Uniques, Sets & Codex', 'ייחודיים, סטים וקודקס'), render: sectionGear },
     { id: 'awakenings', title: L('Unique Awakenings', 'התעוררויות ייחודיות'), render: sectionAwakenings },
     { id: 'forge', title: L('Blacksmithing', 'נפחות'), render: sectionForge },
     { id: 'materials', title: L('Materials & Drops', 'חומרים ושלל'), render: sectionMaterials },
@@ -552,6 +781,9 @@
     { id: 'atlas', title: L('Realm Atlas', 'אטלס הממלכות'), render: sectionAtlas },
     { id: 'bosses', title: L('Boss Guides', 'מדריכי בוסים'), render: sectionBosses },
     { id: 'guilds', title: L('Guilds & Companions', 'גילדות ובני לוויה'), render: sectionGuilds },
+    { id: 'living', title: L('Party, Raids & Adventurers', 'חבורה, פשיטות והרפתקנים'), render: sectionLiving },
+    { id: 'world', title: L('Mounts, Pets & Events', 'רכיבה, חיות ואירועים'), render: sectionWorld3 },
+    { id: 'journal', title: L('Journal & Bestiary', 'יומן ובסטיאריום'), render: sectionJournal },
     { id: 'economy', title: L('Economy & Housing', 'כלכלה ודיור'), render: sectionEconomy },
     { id: 'endgame', title: L('Abyss & Coliseum', 'התהום והקולוסיאום'), render: sectionEndgame },
   ];

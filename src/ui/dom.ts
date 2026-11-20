@@ -2,7 +2,8 @@
 import type { GearItem, StatBlock } from '../types/game';
 import { G } from '../core/state';
 import { GRADE_INFO, RARITY_COLORS, RARITY_NAMES, TIERS, WEAPON_INFO, ARMOR_INFO, GEM_INFO } from '../data/constants';
-import { gearStats, gearTitle, gearValue, itemDef } from '../data/items';
+import { affixLabel, gearStats, gearTitle, gearValue, itemDef } from '../data/items';
+import { POWER_BY_ID, SET_BY_ID, UNIQUE_BY_ID, setCountsOf, SETS } from '../data/v3';
 import { activeSet, effectiveSockets } from '../systems/stats';
 import { gearIconURL, itemIconURL } from '../render/icons';
 
@@ -74,12 +75,13 @@ export function initTooltip(root: HTMLElement): void {
     if (!tipEl || tipEl.style.display !== 'block') return;
     const pad = 16;
     const r = tipEl.getBoundingClientRect();
+    const host = root.getBoundingClientRect();
     let x = e.clientX + pad;
     let y = e.clientY + pad;
-    if (x + r.width > window.innerWidth - 8) x = e.clientX - r.width - pad;
-    if (y + r.height > window.innerHeight - 8) y = Math.max(8, window.innerHeight - r.height - 8);
-    tipEl.style.left = x + 'px';
-    tipEl.style.top = y + 'px';
+    if (x + r.width > window.innerWidth - 8) x = Math.max(8, e.clientX - r.width - pad);
+    if (y + r.height > window.innerHeight - 8) y = Math.max(host.top + 8, window.innerHeight - r.height - 8);
+    tipEl.style.left = x - host.left + 'px';
+    tipEl.style.top = y - host.top + 'px';
   });
 }
 
@@ -100,8 +102,9 @@ export function hideTip(): void {
 const STAT_NAMES: Record<keyof StatBlock, string> = {
   atk: 'ATK', def: 'DEF', mag: 'MAG', hp: 'Max HP', mp: 'Max MP', crit: 'Crit Chance', critDmg: 'Crit Damage', aspd: 'Attack Speed',
   move: 'Move Speed', brk: 'Break Power', block: 'Block Efficiency', regen: 'MP Regen', atkPct: 'ATK', defPct: 'DEF', magPct: 'MAG', hpPct: 'Max HP', xpPct: 'XP Gain',
+  lifesteal: 'Lifesteal', skillDmg: 'Skill Damage', cdr: 'Cooldown Reduction', magicFind: 'Magic Find',
 };
-const PCT = new Set<keyof StatBlock>(['crit', 'critDmg', 'aspd', 'move', 'block', 'regen', 'atkPct', 'defPct', 'magPct', 'hpPct', 'xpPct']);
+const PCT = new Set<keyof StatBlock>(['crit', 'critDmg', 'aspd', 'move', 'block', 'regen', 'atkPct', 'defPct', 'magPct', 'hpPct', 'xpPct', 'lifesteal', 'skillDmg', 'cdr', 'magicFind']);
 
 export function fmtStat(k: keyof StatBlock, v: number): string {
   if (PCT.has(k)) return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(v * 100 % 1 ? 1 : 0)}%`;
@@ -134,23 +137,42 @@ export function equippedCounterpart(g: GearItem): GearItem | null {
   return eq && eq.uid !== g.uid ? eq : null;
 }
 
-export function gearTooltip(g: GearItem, compare = true): string {
+/** one gear card; with `cmp` every stat line shows its difference against the equipped piece */
+export function gearCard(g: GearItem, cmp?: GearItem | null, header = ''): string {
   const rc = RARITY_COLORS[g.rarity];
   const type = g.kind === 'weapon' ? WEAPON_INFO[g.wtype!].name : ARMOR_INFO[g.aslot!].name;
-  const other = compare ? equippedCounterpart(g) : null;
   const sockets = effectiveSockets(g, G.save?.awakenings.includes('aw_smith') ?? false);
   let gems = '';
   for (let i = 0; i < sockets; i++) {
     const gem = g.gems[i];
     gems += gem ? `<span class="gem" style="color:${GEM_INFO[gem].color}">◆ ${GEM_INFO[gem].name}</span>` : '<span class="gem empty">◇ Empty socket</span>';
   }
-  return `<div class="tt-title" style="color:${rc}">${esc(gearTitle(g))}</div>
-<div class="tt-sub">${RARITY_NAMES[g.rarity]} ${type} • ${TIERS[g.tier].name} tier${g.grade ? ` • <span style="color:${GRADE_INFO[g.grade].color}">${GRADE_INFO[g.grade].name}</span>` : ''}</div>
-${statLines(gearStats(g), other ? gearStats(other) : undefined)}
+  const affixes = (g.affixes ?? []).map((a) => `<div class="tt-affix">✦ ${affixLabel(a)}</div>`).join('');
+  const pw = g.power ? POWER_BY_ID[g.power] : null;
+  const uq = g.unique ? UNIQUE_BY_ID[g.unique] : null;
+  const set = g.set ? SET_BY_ID[g.set] : null;
+  let setHtml = '';
+  if (set && G.save) {
+    const n = setCountsOf(G.save)[SETS.indexOf(set)] ?? 0;
+    const line = (need: number, desc: string) => `<div class="tt-setb${n >= need ? ' on' : ''}">(${need}) ${esc(desc)}</div>`;
+    setHtml = `<div class="tt-set" style="--sc:${set.color}"><div class="tt-set-name">${esc(set.name)} <span>${Math.min(6, n)}/6</span></div>${line(2, set.b2.desc)}${line(4, set.b4.desc)}${line(6, set.b6.desc)}</div>`;
+  }
+  return `${header ? `<div class="tt-head">${header}</div>` : ''}<div class="tt-title" style="color:${rc}">${esc(gearTitle(g))}</div>
+<div class="tt-sub">${RARITY_NAMES[g.rarity]} ${uq ? 'Unique ' : set ? 'Set ' : ''}${type} • ${TIERS[g.tier].name} tier${g.grade ? ` • <span style="color:${GRADE_INFO[g.grade].color}">${GRADE_INFO[g.grade].name}</span>` : ''}</div>
+${statLines(gearStats(g), cmp ? gearStats(cmp) : undefined)}
+${affixes ? `<div class="tt-affixes">${affixes}</div>` : ''}
+${pw ? `<div class="tt-power" style="--pc:${pw.color}"><b>★ ${esc(pw.name)}</b><span>${esc(pw.desc)}</span></div>` : ''}
+${setHtml}
 ${gems ? `<div class="tt-gems">${gems}</div>` : ''}
+${uq ? `<div class="tt-flavor">"${esc(uq.flavor)}"</div>` : ''}
 ${g.forgedBy ? `<div class="tt-forged">Forged by ${esc(g.forgedBy)}</div>` : ''}
-${other ? `<div class="tt-note">Compared with equipped: ${esc(gearTitle(other))}</div>` : ''}
 <div class="tt-value">Value ${gearValue(g).toLocaleString()} G</div>`;
+}
+
+export function gearTooltip(g: GearItem, compare = true): string {
+  const other = compare ? equippedCounterpart(g) : null;
+  if (!other) return gearCard(g);
+  return `<div class="tt-compare"><div class="tt-card eqcard">${gearCard(other, null, 'Equipped')}</div><div class="tt-card">${gearCard(g, other, 'Selected')}</div></div>`;
 }
 
 export function itemTooltip(id: string, extra = ''): string {

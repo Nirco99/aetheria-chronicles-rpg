@@ -213,6 +213,36 @@ function paintGround(g: CanvasRenderingContext2D, realm: number, type: number, v
       }
       break;
     }
+    case GT.SHALLOW: {
+      const sand = P.liquid === 'water' ? '#d8c89a' : shade(P.path, -0.1);
+      g.fillStyle = mix(sand, P.liquidA, 0.5);
+      g.fillRect(0, 0, TILE, TILE);
+      speckle(g, seed, 7, [rgba('#ffffff', 0.25), rgba(shade(sand, -0.3), 0.6)], 1.6);
+      g.strokeStyle = rgba('#ffffff', 0.32);
+      g.lineWidth = 0.9;
+      for (let i = 0; i < 2; i++) {
+        const y = 8 + i * 13 + v * 2;
+        g.beginPath();
+        g.moveTo(3 + v * 3, y);
+        g.quadraticCurveTo(12 + v * 2, y - 2, 22 + v, y);
+        g.stroke();
+      }
+      g.fillStyle = rgba(P.liquidB, 0.18);
+      g.fillRect(0, 0, TILE, TILE);
+      break;
+    }
+    case GT.BRIDGE: {
+      for (let y = 0; y < TILE; y += 6) {
+        g.fillStyle = (y / 6 + v) % 2 ? '#8a6040' : '#76502e';
+        g.fillRect(0, y, TILE, 5);
+        g.fillStyle = '#3a2414';
+        g.fillRect(0, y + 5, TILE, 1);
+        g.fillStyle = '#c9a46e';
+        g.fillRect(3 + ((y + v * 5) % 7), y + 2, 1.2, 1.2);
+        g.fillRect(TILE - 5 - ((y + v * 3) % 5), y + 2, 1.2, 1.2);
+      }
+      break;
+    }
     case GT.FLOOR:
     case GT.FLOOR2: {
       const base = type === GT.FLOOR ? P.floor : P.floor2;

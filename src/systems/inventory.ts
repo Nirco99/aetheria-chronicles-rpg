@@ -1,4 +1,5 @@
 // Inventory, equipment and consumable use.
+import { startTreasureHunt } from './events';
 import type { EquipSlot, GearItem } from '../types/game';
 import { G } from '../core/state';
 import { GEAR_CAPACITY } from '../data/constants';
@@ -103,6 +104,11 @@ export function isEquipped(uid: string): boolean {
 
 export function useConsumable(id: string): boolean {
   const d = itemDef(id);
+  if (id === 'treasure_map') {
+    if (countItem(id) < 1 || !startTreasureHunt()) return false;
+    removeItem(id, 1);
+    return true;
+  }
   if (!d.effect || countItem(id) < 1) return false;
   const p = G.player;
   if (p.dead) return false;

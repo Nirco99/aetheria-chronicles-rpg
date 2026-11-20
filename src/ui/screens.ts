@@ -11,15 +11,33 @@ import { visOf } from '../render/gear';
 import { audio } from '../engine/audio';
 import { fmtTime } from '../engine/util';
 import { h, btn } from './dom';
+import { RESOLUTIONS, desktop, isDesktop, isFullscreen, openWikiExternal, quitToDesktop, toggleFullscreen } from '../platform/desktop';
 
 export function isElectron(): boolean {
-  return navigator.userAgent.includes('Electron');
+  return isDesktop || navigator.userAgent.includes('Electron');
 }
 
+/** the strategy wiki is the one external website: it opens in the OS browser */
 export function openWiki(): void {
-  const url = new URL('wiki/index.html', window.location.href).href;
-  window.open(url, '_blank');
+  openWikiExternal();
   audio.play('ui');
+  G.ui.toast('The Strategy Wiki opened in your web browser.', 'info');
+}
+
+export function openSavesFolder(): void {
+  if (!desktop) {
+    G.ui.toast('Saves live in browser storage in the web build. The desktop app keeps them in its saves folder.', 'info');
+    return;
+  }
+  void desktop.openSavesFolder();
+  G.ui.toast(`Opened ${desktop.savesDir} in Explorer.`, 'info');
+}
+
+function confirmQuitDesktop(): void {
+  G.ui.confirm('Save and quit Aetheria Chronicles to the desktop?', () => {
+    if (G.game.state === 'play') saveGame();
+    quitToDesktop();
+  }, 'Quit to Desktop');
 }
 
 // ------------------------------------------------------------------ title
@@ -31,8 +49,9 @@ export function showTitle(): void {
     btn('New Game', () => showCreate(), last === null ? 'primary big' : 'big'),
     btn('Load Game', () => showSlots(), 'big'),
     btn('Settings', () => openSettings(), 'big'),
-    btn('Open Strategy Wiki (EN / עברית)', () => openWiki(), 'big wiki'),
-    isElectron() ? btn('Quit', () => window.close(), 'big ghost') : null,
+    btn('Open Strategy Wiki (opens in browser)', () => openWiki(), 'big wiki'),
+    btn('Open Saves Folder', () => openSavesFolder(), 'big ghost'),
+    btn('Quit to Desktop', () => confirmQuitDesktop(), 'big ghost'),
   );
   const el = h('div', { class: 'screen title' },
     h('div', { class: 'logo' },
@@ -40,7 +59,7 @@ export function showTitle(): void {
       h('div', { class: 'logo-sub', text: 'SWORD  &  FORGE' }),
       h('div', { class: 'logo-tag', text: 'A real-time action RPG of sword skills, blacksmithing and five floating realms' })),
     menu,
-    h('div', { class: 'title-foot', text: `v1.0  •  ${isElectron() ? 'Desktop edition • F11 fullscreen' : 'Web edition'}  •  All art, music and sound are generated procedurally` }));
+    h('div', { class: 'title-foot', text: `v${desktop?.version ?? '3.0.0'}  •  Full-Dive Desktop Edition  •  F11 / Alt+Enter fullscreen  •  All art, music and sound are generated procedurally` }));
   G.ui.setScreen(el);
 }
 
@@ -188,9 +207,46 @@ export function openSettings(): void {
       });
       return h('label', { class: 'set-row check' }, h('span', { text: label }), inp);
     };
+    const styleToggle = (() => {
+      const inp = h('input', { type: 'checkbox', checked: s.styleMeter });
+      inp.addEventListener('change', () => (s.styleMeter = inp.checked));
+      return h('label', { class: 'set-row check' }, h('span', { text: 'Style Meter (D - SSS)' }), inp);
+    })();
+    const quality = h('select', { class: 'select' }) as HTMLSelectElement;
+    for (const [v, label] of [[0.75, 'Performance (0.75x)'], [1, 'Native (1x)'], [1.5, 'Supersampled (1.5x)'], [2, 'Ultra Supersampled (2x)']] as [number, string][]) {
+      const o = h('option', { value: String(v), text: label }) as HTMLOptionElement;
+      if (Math.abs(s.quality - v) < 0.01) o.selected = true;
+      quality.append(o);
+    }
+    quality.addEventListener('change', () => {
+      s.quality = Number(quality.value);
+      G.game.applySettings();
+    });
+    const fsBox = h('input', { type: 'checkbox', checked: isFullscreen() });
+    fsBox.addEventListener('change', () => {
+      const on = toggleFullscreen();
+      s.fullscreen = desktop ? on : fsBox.checked;
+    });
+    const res = h('select', { class: 'select' }) as HTMLSelectElement;
+    res.append(h('option', { value: '', text: 'Window size...' }));
+    for (const r of RESOLUTIONS) res.append(h('option', { value: r.id, text: `${r.w} x ${r.h}` }));
+    res.addEventListener('change', () => {
+      const r = RESOLUTIONS.find((x) => x.id === res.value);
+      if (!r) return;
+      s.resolution = r.id;
+      s.fullscreen = false;
+      fsBox.checked = false;
+      if (desktop) desktop.setResolution(r.w, r.h);
+      else G.ui.toast('Window sizes apply to the desktop app.', 'info');
+    });
     box.append(h('div', { class: 'modal-title', text: 'Settings' }),
       slider('Master Volume', 'master'), slider('Music', 'music'), slider('Sound Effects', 'sfx'),
-      toggle('Screen Shake', 'shake'), toggle('Damage Numbers', 'numbers'), toggle('Show FPS', 'fps'),
+      toggle('Screen Shake', 'shake'), toggle('Damage Numbers', 'numbers'), toggle('Show FPS', 'fps'), styleToggle,
+      h('div', { class: 'modal-sub', text: 'Display' }),
+      h('label', { class: 'set-row check' }, h('span', { text: 'Fullscreen (F11 / Alt+Enter)' }), fsBox),
+      h('div', { class: 'set-row' }, h('span', { text: 'Resolution' }), res),
+      h('div', { class: 'set-row' }, h('span', { text: 'Render quality' }), quality),
+      h('div', { class: 'row' }, btn('Open Saves Folder', () => openSavesFolder(), 'ghost')),
       h('div', { class: 'row end' }, btn('Done', () => {
         saveSettings(G.settings);
         close();
@@ -211,11 +267,18 @@ export function openPause(): void {
           G.ui.toast(saveGame() ? 'Game saved.' : 'Saving failed (storage unavailable).', 'info');
         }),
         btn('Character & Inventory (I)', () => G.ui.openCharacter('equipment')),
-        btn('Mastery & Sword Skills (K)', () => G.ui.openCharacter('mastery')),
+        btn('Constellation Skill Graph (K)', () => G.ui.openConstellation()),
+        btn('Journal: Achievements & Titles (N)', () => G.ui.openJournal()),
+        btn('Bestiary (O)', () => G.ui.openBestiary()),
+        btn('Stable & Pets (P)', () => G.ui.openStable()),
+        btn('Wardrobe (T)', () => G.ui.openWardrobe()),
+        btn('Relic Codex (U)', () => G.ui.openCodex(false)),
         btn("Adventurer's Handbook (H)", () => openHandbook()),
         btn('Settings', () => openSettings()),
-        btn('Open Strategy Wiki (EN / עברית)', () => openWiki(), 'wiki'),
+        btn('Open Strategy Wiki (opens in browser)', () => openWiki(), 'wiki'),
+        btn('Open Saves Folder', () => openSavesFolder()),
         btn('Save & Quit to Title', () => G.ui.confirm('Save and return to the title screen?', () => G.game.quitToTitle(), 'Quit'), 'danger'),
+        btn('Save & Quit to Desktop', () => confirmQuitDesktop(), 'danger'),
       ));
   });
 }
