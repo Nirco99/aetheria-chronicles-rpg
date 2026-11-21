@@ -523,6 +523,8 @@ export interface Prop {
   light?: { r: number; color: string; flicker?: boolean; oy?: number };
   data?: Record<string, unknown>;
   hidden?: boolean;
+  /** 3D renderer: drawn by the instanced foliage layer instead of the prop layer */
+  hidden3d?: boolean;
 }
 
 export interface ResourceNode {
@@ -834,6 +836,8 @@ export interface Settings {
   /** render supersampling multiplier on top of devicePixelRatio */
   quality: number;
   styleMeter: boolean;
+  /** v4 graphics preset: 'auto' picks one for the detected GPU */
+  gfx: 'auto' | 'classic' | 'low' | 'medium' | 'high' | 'ultra' | 'cinematic';
 }
 
 export interface LeaderEntry {

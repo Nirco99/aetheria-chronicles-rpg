@@ -5,7 +5,7 @@ import type { Actor } from './entities/actor';
 import { G } from './core/state';
 import { Input } from './engine/input';
 import { audio } from './engine/audio';
-import { Renderer } from './render/renderer';
+import { RenderHost } from './gfx/host';
 import { drawHud } from './render/hud';
 import { fx } from './render/fx';
 import { BootSequence } from './render/boot';
@@ -29,13 +29,14 @@ import { runSelftest } from './platform/selftest';
 import { GAMBITS, GAMBIT_ORDER } from './data/v3';
 import { checkAchievements } from './systems/achievements';
 import { style } from './systems/feel';
+import { drawWorldOverlay } from './gfx/overlay';
 
 type GState = 'title' | 'boot' | 'play';
 
 const STEP = 1 / 60;
 
 export class Game {
-  readonly renderer: Renderer;
+  readonly renderer: RenderHost;
   state: GState = 'title';
   private boot: BootSequence | null = null;
   private last = 0;
@@ -53,10 +54,10 @@ export class Game {
   /** hard time-freeze (Perfect Parry, Finishing Nova): the world stops, rendering continues */
   private freezeT = 0;
 
-  constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
+  constructor(canvas: HTMLCanvasElement, canvas3d: HTMLCanvasElement, hud: HTMLCanvasElement, uiRoot: HTMLElement) {
     G.game = this;
-    G.input = new Input(canvas);
-    this.renderer = new Renderer(canvas);
+    G.input = new Input(hud);
+    this.renderer = new RenderHost(canvas, canvas3d, hud);
     G.ui = new UI(uiRoot);
     G.world = new World();
     migrateBrowserSaves();
@@ -73,7 +74,11 @@ export class Game {
   start(): void {
     this.applySettings();
     this.titleScene();
-    if (desktop?.selftest) runSelftest(() => this.startSelftest());
+    const forced = new URLSearchParams(location.search).get('gfx') as typeof G.settings.gfx | null;
+    const gfxReady = this.renderer.setPreset(forced ?? G.settings.gfx).then(() => {
+      if (this.renderer.failure) G.ui.toast(this.renderer.failure, 'warn');
+    });
+    if (desktop?.selftest) runSelftest(() => this.startSelftest(), gfxReady);
     else G.ui.showTitle();
     if (desktop && G.settings.fullscreen && !desktop.isFullscreen()) desktop.setFullscreen(true);
     requestAnimationFrame((t) => {
@@ -91,6 +96,54 @@ export class Game {
         tp: (map: string, entry = 'gate') => G.world.travel(map, entry),
         spawn: (id: string, lvl = 5) => G.world.spawnMonster(id, lvl, G.player.x + 120, G.player.y, []),
         time: (h: number) => (G.save.time = h),
+        /** renders a frame and posts world + HUD canvases to the dev server (node_modules/.cache/shots) */
+        shot: async (name = 'shot', maxW = 1280) => {
+          this.render(performance.now() / 1000);
+          const host = this.renderer;
+          const src = host.is3d ? host.canvas3d : host.canvas2d;
+          const c = document.createElement('canvas');
+          const k = Math.min(1, maxW / host.w);
+          c.width = Math.round(host.w * k);
+          c.height = Math.round(host.h * k);
+          const g = c.getContext('2d') as CanvasRenderingContext2D;
+          g.drawImage(src, 0, 0, c.width, c.height);
+          g.drawImage(host.hud, 0, 0, c.width, c.height);
+          // the DOM menus are rasterised through an SVG foreignObject so screens can be checked too
+          try {
+            const css = Array.from(document.styleSheets).map((sh) => {
+              try {
+                return Array.from(sh.cssRules).map((r) => r.cssText).join('\n');
+              } catch {
+                return '';
+              }
+            }).join('\n');
+            const html = new XMLSerializer().serializeToString(document.getElementById('ui') as HTMLElement);
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${host.cssW}" height="${host.cssH}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="width:${host.cssW}px;height:${host.cssH}px;position:relative;color:#e6edf7;font-family:Segoe UI,sans-serif"><style>${css.replace(/</g, '&lt;')} * { animation: none !important; transition: none !important; }</style>${html}</div></foreignObject></svg>`;
+            const img = new Image();
+            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+            await img.decode();
+            g.drawImage(img, 0, 0, c.width, c.height);
+          } catch (err) {
+            console.warn('ui capture failed', err);
+          }
+          const r = await fetch('/__shot?name=' + encodeURIComponent(name), { method: 'POST', body: c.toDataURL('image/jpeg', 0.88) });
+          return `${name}:${r.status}:${c.width}x${c.height}`;
+        },
+        gfx: (p: string) => this.renderer.setPreset(p as 'auto'),
+        /** advances the simulation by fixed steps (the hidden preview pane throttles requestAnimationFrame) */
+        step: (seconds = 0.1) => {
+          const n = Math.max(1, Math.round(seconds / STEP));
+          for (let i = 0; i < n; i++) {
+            G.time += STEP;
+            G.realTime += STEP;
+            this.frameDt = STEP;
+            G.world.update(STEP, STEP);
+            fx.update(STEP, STEP);
+            G.input.endFrame();
+            this.renderer.update(STEP);
+          }
+          return n;
+        },
       };
     }
   }
@@ -209,13 +262,18 @@ export class Game {
 
   // ---------------------------------------------------------------- helpers
 
+  /** the 2D sprite aims from its chest (14px up the screen); the 3D view picks the true ground point */
+  get aimLift(): number {
+    return this.renderer.is3d ? 0 : 14;
+  }
+
   mouseWorld(): { x: number; y: number } {
     return this.renderer.screenToWorld(G.input.mx, G.input.my);
   }
 
   mouseAimFor(a: Actor): number {
     const m = this.mouseWorld();
-    return angTo(a.x, a.y - 14, m.x, m.y);
+    return angTo(a.x, a.y - this.aimLift, m.x, m.y);
   }
 
   slowmo(dur: number, scale: number): void {
@@ -382,20 +440,22 @@ export class Game {
   private render(t: number): void {
     const ctx = this.renderer.ctx;
     if (this.state === 'boot' && this.boot) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       this.boot.draw(ctx, this.renderer.w, this.renderer.h);
       return;
     }
     this.renderer.render(t);
     const k = this.renderer.h / UI_H;
     if (this.state === 'play') {
+      if (this.renderer.is3d) drawWorldOverlay(ctx, this.renderer);
       drawHud(ctx, this.renderer, t);
       ctx.setTransform(k, 0, 0, k, 0, 0);
-      fx.drawScreen(ctx, this.renderer.w / k, UI_H);
+      fx.drawScreen(ctx, this.renderer.w / k, UI_H, this.renderer.is3d);
     } else {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       const g = ctx.createRadialGradient(this.renderer.w / 2, this.renderer.h / 2, this.renderer.h * 0.2, this.renderer.w / 2, this.renderer.h / 2, this.renderer.h);
-      g.addColorStop(0, 'rgba(4,6,14,0.15)');
-      g.addColorStop(1, 'rgba(4,6,14,0.85)');
+      g.addColorStop(0, this.renderer.is3d ? 'rgba(4,6,14,0.05)' : 'rgba(4,6,14,0.15)');
+      g.addColorStop(1, this.renderer.is3d ? 'rgba(4,6,14,0.6)' : 'rgba(4,6,14,0.85)');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, this.renderer.w, this.renderer.h);
     }

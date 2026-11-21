@@ -11,7 +11,8 @@ import { visOf } from '../render/gear';
 import { audio } from '../engine/audio';
 import { fmtTime } from '../engine/util';
 import { h, btn } from './dom';
-import { RESOLUTIONS, desktop, isDesktop, isFullscreen, openWikiExternal, quitToDesktop, toggleFullscreen } from '../platform/desktop';
+import { GAME_VERSION, RESOLUTIONS, desktop, isDesktop, isFullscreen, openWikiExternal, quitToDesktop, toggleFullscreen } from '../platform/desktop';
+import { PRESET_ORDER, QUALITY, detectGpu, recommendPreset, type GfxPreset } from '../gfx/quality';
 
 export function isElectron(): boolean {
   return isDesktop || navigator.userAgent.includes('Electron');
@@ -21,7 +22,7 @@ export function isElectron(): boolean {
 export function openWiki(): void {
   openWikiExternal();
   audio.play('ui');
-  G.ui.toast('The Strategy Wiki opened in your web browser.', 'info');
+  G.ui.toast('The Aetheria Codex opened in your web browser.', 'info');
 }
 
 export function openSavesFolder(): void {
@@ -48,18 +49,28 @@ export function showTitle(): void {
     last !== null ? btn('Continue', () => G.game.loadSlot(last), 'primary big') : null,
     btn('New Game', () => showCreate(), last === null ? 'primary big' : 'big'),
     btn('Load Game', () => showSlots(), 'big'),
-    btn('Settings', () => openSettings(), 'big'),
-    btn('Open Strategy Wiki (opens in browser)', () => openWiki(), 'big wiki'),
-    btn('Open Saves Folder', () => openSavesFolder(), 'big ghost'),
-    btn('Quit to Desktop', () => confirmQuitDesktop(), 'big ghost'),
+    btn('Settings & Graphics', () => openSettings(), 'big'),
+    btn('Aetheria Codex & Database', () => openWiki(), 'big wiki'),
+    desktop ? btn('Open Saves Folder', () => openSavesFolder(), 'big ghost') : null,
+    desktop ? btn('Quit to Desktop', () => confirmQuitDesktop(), 'big ghost') : null,
   );
+  const r = G.game.renderer;
+  const gfx = h('button', { class: 'gfx-chip', onclick: () => openSettings() });
+  const refreshChip = (): void => {
+    if (!gfx.isConnected && gfx.textContent) return;
+    gfx.textContent = `Graphics: ${r.presetLabel()}${r.is3d ? '  (3D)' : ''}`;
+  };
+  refreshChip();
+  window.setTimeout(refreshChip, 1200);
+  window.setTimeout(refreshChip, 3500);
   const el = h('div', { class: 'screen title' },
     h('div', { class: 'logo' },
       h('div', { class: 'logo-top', text: 'AETHERIA CHRONICLES' }),
       h('div', { class: 'logo-sub', text: 'SWORD  &  FORGE' }),
-      h('div', { class: 'logo-tag', text: 'A real-time action RPG of sword skills, blacksmithing and five floating realms' })),
+      h('div', { class: 'logo-tag', text: 'A real-time 3D action RPG of sword skills, blacksmithing and five floating realms' })),
     menu,
-    h('div', { class: 'title-foot', text: `v${desktop?.version ?? '3.0.0'}  •  Full-Dive Desktop Edition  •  F11 / Alt+Enter fullscreen  •  All art, music and sound are generated procedurally` }));
+    gfx,
+    h('div', { class: 'title-foot', text: `v${desktop?.version ?? GAME_VERSION}  •  Ascension Edition  •  ${desktop ? 'F11 / Alt+Enter fullscreen' : 'F11 fullscreen'}  •  Every model, texture, sound and note is generated procedurally` }));
   G.ui.setScreen(el);
 }
 
@@ -239,13 +250,41 @@ export function openSettings(): void {
       if (desktop) desktop.setResolution(r.w, r.h);
       else G.ui.toast('Window sizes apply to the desktop app.', 'info');
     });
+    // ---- graphics: renderer + quality preset, applied live
+    const rec = recommendPreset();
+    const gfxSel = h('select', { class: 'select gfx-select' }) as HTMLSelectElement;
+    const label = (p: GfxPreset): string => (p === 'classic' ? 'Classic 2D (original canvas renderer)' : `3D - ${QUALITY[p].label}`);
+    gfxSel.append(h('option', { value: 'auto', text: `Auto (recommended: ${rec === 'classic' ? 'Classic 2D' : QUALITY[rec].label})` }));
+    for (const p of PRESET_ORDER) gfxSel.append(h('option', { value: p, text: label(p) }));
+    gfxSel.value = s.gfx;
+    const gfxDesc = h('div', { class: 'gfx-desc' });
+    const gpu = detectGpu();
+    const describe = (): void => {
+      const cur = G.game.renderer.preset;
+      const d = cur === 'classic' ? 'The original 2D renderer. Runs on anything.' : QUALITY[cur].desc;
+      gfxDesc.innerHTML = '';
+      gfxDesc.append(h('div', { text: d }), h('small', { class: 'dim', text: `GPU: ${gpu || 'unknown'}${G.game.renderer.is3d ? '  -  ' + (G.game.renderer.engine?.info() ?? '') : ''}` }));
+    };
+    gfxSel.addEventListener('change', () => {
+      s.gfx = gfxSel.value as typeof s.gfx;
+      gfxDesc.textContent = 'Switching renderer...';
+      void G.game.renderer.setPreset(s.gfx).then(() => {
+        if (G.game.renderer.failure) G.ui.toast(G.game.renderer.failure, 'warn');
+        describe();
+      });
+    });
+    describe();
     box.append(h('div', { class: 'modal-title', text: 'Settings' }),
+      h('div', { class: 'modal-sub', text: 'Graphics' }),
+      h('div', { class: 'set-row' }, h('span', { text: 'Renderer & quality' }), gfxSel),
+      gfxDesc,
+      h('div', { class: 'modal-sub', text: 'Audio & interface' }),
       slider('Master Volume', 'master'), slider('Music', 'music'), slider('Sound Effects', 'sfx'),
       toggle('Screen Shake', 'shake'), toggle('Damage Numbers', 'numbers'), toggle('Show FPS', 'fps'), styleToggle,
       h('div', { class: 'modal-sub', text: 'Display' }),
       h('label', { class: 'set-row check' }, h('span', { text: 'Fullscreen (F11 / Alt+Enter)' }), fsBox),
       h('div', { class: 'set-row' }, h('span', { text: 'Resolution' }), res),
-      h('div', { class: 'set-row' }, h('span', { text: 'Render quality' }), quality),
+      h('div', { class: 'set-row' }, h('span', { text: 'Classic 2D render quality' }), quality),
       h('div', { class: 'row' }, btn('Open Saves Folder', () => openSavesFolder(), 'ghost')),
       h('div', { class: 'row end' }, btn('Done', () => {
         saveSettings(G.settings);
@@ -274,11 +313,11 @@ export function openPause(): void {
         btn('Wardrobe (T)', () => G.ui.openWardrobe()),
         btn('Relic Codex (U)', () => G.ui.openCodex(false)),
         btn("Adventurer's Handbook (H)", () => openHandbook()),
-        btn('Settings', () => openSettings()),
-        btn('Open Strategy Wiki (opens in browser)', () => openWiki(), 'wiki'),
-        btn('Open Saves Folder', () => openSavesFolder()),
+        btn('Settings & Graphics', () => openSettings()),
+        btn('Aetheria Codex & Database', () => openWiki(), 'wiki'),
+        desktop ? btn('Open Saves Folder', () => openSavesFolder()) : null,
         btn('Save & Quit to Title', () => G.ui.confirm('Save and return to the title screen?', () => G.game.quitToTitle(), 'Quit'), 'danger'),
-        btn('Save & Quit to Desktop', () => confirmQuitDesktop(), 'danger'),
+        desktop ? btn('Save & Quit to Desktop', () => confirmQuitDesktop(), 'danger') : null,
       ));
   });
 }

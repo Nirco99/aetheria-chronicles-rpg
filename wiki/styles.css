@@ -86,6 +86,9 @@ html[lang='he'] .brand-title { font-family: var(--he); }
 .gsearch:focus-within { border-color: var(--cyan); color: var(--cyan); }
 .gsearch input { width: 220px; max-width: 34vw; border: 0; outline: none; background: transparent; color: var(--text); font: inherit; font-size: 0.92rem; }
 .lang { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: rgba(13, 20, 40, 0.85); flex: none; }
+.play-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; font: 700 13px var(--sans); color: #fff8e0; text-decoration: none; background: linear-gradient(180deg, #c9962a, #7a5414); border: 1px solid #ffd166; box-shadow: 0 0 18px rgba(255, 209, 102, 0.25); white-space: nowrap; }
+.play-btn:hover { filter: brightness(1.12); }
+.play-btn[hidden] { display: none; }
 .lang-btn { border: 0; background: transparent; color: var(--text); font: 600 13px var(--sans); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
 .lang-btn[lang='he'] { font-family: var(--he); }
 .lang-btn.on { background: linear-gradient(180deg, #2f7fb0, #1a4a78); box-shadow: 0 0 0 1px var(--cyan) inset; }

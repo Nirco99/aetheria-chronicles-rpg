@@ -7,6 +7,8 @@ import { captureErrors } from './platform/selftest';
 if (desktop?.selftest) captureErrors();
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
+const canvas3d = document.getElementById('game3d') as HTMLCanvasElement;
+const hud = document.getElementById('hud') as HTMLCanvasElement;
 const uiRoot = document.getElementById('ui') as HTMLElement;
-const game = new Game(canvas, uiRoot);
+const game = new Game(canvas, canvas3d, hud, uiRoot);
 game.start();

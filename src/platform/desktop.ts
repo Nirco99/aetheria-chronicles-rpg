@@ -26,7 +26,8 @@ export interface DesktopBridge {
 
 export const desktop: DesktopBridge | null = (window as unknown as { aetheriaDesktop?: DesktopBridge }).aetheriaDesktop ?? null;
 export const isDesktop = !!desktop;
-export const WIKI_URL = 'https://nirco99.github.io/aetheria-chronicles-rpg/';
+export const WIKI_URL = 'https://nirco99.github.io/aetheria-chronicles-rpg/wiki/';
+export const GAME_VERSION = '4.0.0';
 export const REPO_URL = 'https://github.com/Nirco99/aetheria-chronicles-rpg';
 export const TITLEBAR_H = 32;
 
@@ -110,7 +111,7 @@ export function migrateBrowserSaves(): number {
 
 export function openWikiExternal(): void {
   if (desktop) desktop.openWiki();
-  else window.open(WIKI_URL, '_blank', 'noopener');
+  else window.open(location.protocol.startsWith('http') ? './wiki/' : WIKI_URL, '_blank', 'noopener');
 }
 
 export function quitToDesktop(): void {
@@ -137,7 +138,7 @@ export function installTitlebar(onChange: () => void): void {
   const ver = desktop.version;
   bar.innerHTML =
     '<svg viewBox="0 0 64 64" width="18" height="18" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0b1630"/><path d="M32 6l5 30h-10z" fill="#7fe9ff"/><rect x="20" y="36" width="24" height="5" rx="2" fill="#f2c14e"/><rect x="29" y="41" width="6" height="14" rx="2" fill="#8a5a2b"/></svg>' +
-    `<span class="tb-title">Aetheria Chronicles</span><span class="tb-sub">Sword &amp; Forge - Full-Dive Desktop Edition v${ver}</span>`;
+    `<span class="tb-title">Aetheria Chronicles</span><span class="tb-sub">Sword &amp; Forge - Ascension Edition v${ver}</span>`;
   document.body.prepend(bar);
   const apply = (fs: boolean) => {
     document.body.classList.toggle('framed', !fs);

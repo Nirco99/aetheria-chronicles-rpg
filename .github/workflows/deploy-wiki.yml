@@ -1,9 +1,8 @@
-name: Deploy Strategy Wiki to GitHub Pages
+name: Deploy game and codex to GitHub Pages
 
-# The game is a standalone Windows desktop application (Electron) and is never deployed to the web.
-# Only the bilingual codex in wiki/ is published, at the site root and at /wiki/. Its data bundle and
-# sprite engine are regenerated from the game's src/data on every deploy, so the live codex always
-# matches the source on main.
+# The site root is the playable web build of the game (the same code the Windows desktop app runs).
+# The bilingual Aetheria Codex lives at /wiki/. Its data bundle and sprite engine are regenerated
+# from the game's src/data on every deploy, so the live codex always matches the source on main.
 
 on:
   push:
@@ -40,10 +39,13 @@ jobs:
       - name: Generate the codex from src/data
         run: npm run wiki:build
 
-      - name: Assemble the wiki site
+      - name: Type-check and build the game
+        run: npm run build
+
+      - name: Assemble the site
         run: |
           mkdir -p site/wiki
-          cp -r wiki/. site/
+          cp -r dist/. site/
           cp -r wiki/. site/wiki/
           touch site/.nojekyll
 

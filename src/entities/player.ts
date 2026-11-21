@@ -244,7 +244,7 @@ export class Player extends Actor {
     // aiming
     const mw = G.game.mouseWorld();
     if (performance.now() - inp.lastMouseMove < 50) this.usingMouse = true;
-    const mouseAim = angTo(this.x, this.y - 14, mw.x, mw.y);
+    const mouseAim = angTo(this.x, this.y - G.game.aimLift, mw.x, mw.y);
     const control = this.canAct() && !G.world.transition && !G.game.uiBlocking();
     // movement intent
     let mx = 0;

@@ -520,15 +520,23 @@ function onKill(t: Actor, src: Actor | null): void {
     const m = t as Monster;
     m.die();
     const s = G.save;
-    s.counters.kills++;
-    s.bestiary[m.def.id] = (s.bestiary[m.def.id] ?? 0) + 1;
-    for (const c of G.world.party) if (!c.dead) s.affinity[c.def.id] = (s.affinity[c.def.id] ?? 0) + (m.isBoss ? 40 : m.isElite ? 8 : 1);
-    onEnemyKilled(m);
-    style.add(m.isBoss ? 200 : m.isElite ? 80 : 25, 'Kill');
-    gainXp(m.xpValue);
-    const loot = rollLoot(m);
-    if (loot.gold > 0 || loot.items.length || loot.gear.length) G.world.spawnLoot(m.x, m.y, loot, m.isBoss ? 'chest' : 'crystal');
-    G.world.onMonsterKilled(m);
+    // a kill counts for the Diver when they, their party or the Vanguard landed it, or when they
+    // fought the creature themselves; simulated adventurers hunting elsewhere earn nothing for you
+    const p = G.player;
+    const own = !src || src.kind === 'player' || G.world.party.includes(src as Companion) || G.world.vanguard.includes(src as never) || src.kind === 'prop';
+    const assisted = m.lastHitBy === p || m.target === p || Math.hypot(m.x - p.x, m.y - p.y) < 260;
+    const credit = own || assisted || m.isBoss;
+    if (credit) {
+      s.counters.kills++;
+      s.bestiary[m.def.id] = (s.bestiary[m.def.id] ?? 0) + 1;
+      for (const c of G.world.party) if (!c.dead) s.affinity[c.def.id] = (s.affinity[c.def.id] ?? 0) + (m.isBoss ? 40 : m.isElite ? 8 : 1);
+      onEnemyKilled(m);
+      style.add(m.isBoss ? 200 : m.isElite ? 80 : 25, 'Kill');
+      gainXp(m.xpValue);
+      const loot = rollLoot(m);
+      if (loot.gold > 0 || loot.items.length || loot.gear.length) G.world.spawnLoot(m.x, m.y, loot, m.isBoss ? 'chest' : 'crystal');
+    }
+    G.world.onMonsterKilled(m, credit);
     if (src && src.kind === 'player') {
       const p = src as Player;
       p.onKill(m);

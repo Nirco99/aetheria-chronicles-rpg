@@ -1,21 +1,62 @@
-# Aetheria Chronicles: Sword & Forge — Full-Dive Desktop Edition
+# Aetheria Chronicles: Sword & Forge — Ascension Edition (v4.0)
 
-**A standalone Windows desktop action RPG.** Real-time top-down oblique combat at 60 FPS, Skill Connect chains, Wall-Slam physics, six elemental reactions, unique weapons, armor sets, a Relic Codex, a party of two plus 6-hero raids, simulated adventurers, mounts, pets, fishing, deep blacksmithing, housing and an infinite abyss. Everything you see and hear is generated procedurally: there are no image or audio files.
+**A real-time 3D action RPG that runs in the browser and as a standalone Windows desktop app.** Skill Connect chains, Wall-Slam physics, six elemental reactions, unique weapons, armor sets, a Relic Codex, a party of two plus 6-hero raids, simulated adventurers, mounts, pets, fishing, deep blacksmithing, housing and an infinite abyss. Everything you see and hear is generated procedurally: there are no image, model or audio files.
 
-**Aetheria Codex & Database (English / עברית):** https://nirco99.github.io/aetheria-chronicles-rpg/
+| | |
+| --- | --- |
+| **Play in the browser** | https://nirco99.github.io/aetheria-chronicles-rpg/ |
+| **Aetheria Codex & Database (English / עברית)** | https://nirco99.github.io/aetheria-chronicles-rpg/wiki/ |
 
-The codex is the only part of the project on the web. The game itself is a native desktop app, and its in-game wiki button opens the codex in your default browser (an offline copy ships inside the app). Every number in the codex is generated from the game's own `src/data`, and every sprite is drawn by the game's own renderer.
+Every number in the codex is generated from the game's own `src/data`. The desktop app ships an offline copy of it.
 
 [עברית למטה ↓](#עברית)
 
 ---
+
+## What's new in v4.0: the Ascension Edition
+
+The game now has a real 3D renderer. The simulation, the content and your saves are unchanged; what you look at is new.
+
+- **3D world.** Sculpted terrain with plateaus, cliffs and stairs, blended ground materials, extruded city walls and dungeons, timber-framed buildings with windows that light up at night, and 3D props, furniture, trees, rocks and flowers.
+- **3D characters and creatures.** Procedural rigs for the Diver, companions, adventurers, NPCs, all 16 creature families, mounts and pets, with inverse-kinematic limbs, weapon trails, hit flashes and spawn / death dissolves.
+- **Lighting.** A sun and moon that follow the clock, soft shadows fitted to the camera, sky lighting, up to 24 dynamic point lights for lamps, torches, spells and loot, and volumetric light shafts through the canopy.
+- **Water, lava and weather.** Shoreline foam, depth tint and sun glints; glowing lava; rain, snow, ash, blossom, fireflies and wet ground.
+- **Grass.** Up to 120 GPU-instanced blades per tile that sway in the wind and part around every actor.
+- **Camera and image.** Depth of field, bloom, ambient occlusion, filmic tone mapping and per-realm colour grading, with a cinematic orbit on the title screen.
+- **Interface.** A redrawn HUD (vitals panel with a level medallion, glossy bars, key-capped hotbar), a new title screen and menu theme.
+- **Play in the browser.** The web build is the game itself; the codex moved to `/wiki/`.
+
+A fix that came with it:
+
+- Kills made far away by simulated adventurers no longer give you experience, loot or bounty credit. You still get credit for your own kills, your party's, kills you assisted or stood next to, and every boss.
+
+### Graphics presets
+
+**Settings → Graphics** switches presets live. `Auto` picks one from your GPU.
+
+| Preset | For | What it turns on |
+| --- | --- | --- |
+| **Cinematic 4K** | The strongest GPUs, screenshots | Everything in RTX Ultra at up to 4K, 40-step volumetrics, 120 grass blades per tile |
+| **RTX Ultra** | RTX 4060 class and up (auto-selected there) | 4× MSAA, 4K shadow maps, full-resolution ambient occlusion, 26-step volumetric light, bokeh depth of field, 20 dynamic lights, 84 grass blades per tile |
+| **High** | Mid-range GPUs | Volumetric light, bokeh depth of field, 12 dynamic lights |
+| **Balanced** | Entry gaming GPUs | Ambient occlusion, tilt-shift focus, denser grass |
+| **Laptop** | Integrated graphics | The 3D world with sun shadows and bloom at a reduced resolution |
+| **Classic 2D** | Anything | The original v3 canvas renderer |
+
+Measured on an Intel Iris Xe laptop, the desktop app's self-test holds a steady 60 FPS on **Laptop** (about 54 FPS average, counting the one-off stalls when a window first opens). **RTX Ultra** and **Cinematic 4K** were built for an RTX 4060-class card and render correctly, but have not been timed on one yet. If a preset is too heavy for your machine, step down one row.
+
+To force a preset for one run: `"Aetheria Chronicles.exe" --gfx=ultra`, or add `?gfx=ultra` to the web address. The values are `classic`, `low`, `medium`, `high`, `ultra` and `cinematic`.
+
+## Play in the browser
+
+Open https://nirco99.github.io/aetheria-chronicles-rpg/ in a current Chrome, Edge or Firefox on a desktop or laptop. It needs WebGL 2, a keyboard and a mouse. Saves stay in that browser's local storage. On a PC with a discrete GPU, make sure the browser is using it (Windows: *Settings → System → Display → Graphics*).
 
 ## Play on Windows
 
 | Step | What to do |
 | --- | --- |
 | 1 | Clone or download this repository. |
-| 2 | Double-click **`Launch-Aetheria-Desktop.bat`**. The first time, it builds `release\win-unpacked\Aetheria Chronicles.exe` (this needs [Node.js 20+](https://nodejs.org)). After that it launches the exe directly. |
+| 2 | Double-click **`Launch-Aetheria-Desktop.bat`**. The first time, and again whenever you pull a newer version, it builds `release\win-unpacked\Aetheria Chronicles.exe` (this needs [Node.js 20+](https://nodejs.org)). Otherwise it launches the exe directly. Arguments are passed through, so `Launch-Aetheria-Desktop.bat --gfx=ultra` works. |
 | 3 | *(optional)* Right-click **`Create-Desktop-Shortcut.ps1`** and choose **Run with PowerShell** to put an *Aetheria Chronicles* icon on your desktop. Add `-StartMenu` for a Start Menu entry too. |
 
 You can also run `release\win-unpacked\Aetheria Chronicles.exe` directly. The `win-unpacked` folder is portable, so you can copy it anywhere.
@@ -30,7 +71,8 @@ You can also run `release\win-unpacked\Aetheria Chronicles.exe` directly. The `w
 - **Open Saves Folder** (title screen, pause menu or Settings) opens the folder in Explorer.
 - **F11 / Alt+Enter** toggle fullscreen. **Settings → Display** has:
   - window sizes: 1280×720, 1600×900, 1920×1080 and 2560×1440
-  - render quality: 0.75× to 2× supersampling on top of Windows display scaling
+  - render quality: 0.75× to 2× supersampling on top of Windows display scaling (Classic 2D only; the 3D presets manage resolution themselves)
+- On a PC with both integrated and dedicated graphics, the app asks Windows for the dedicated GPU.
 - **Quit to Desktop** is on the title screen and in the pause menu.
 
 ## Controls
@@ -132,13 +174,17 @@ npm run wiki:build      # regenerate wiki/wiki-data.js and wiki/wiki-engine.js f
 npm run wiki:serve      # preview the codex at http://127.0.0.1:4180/
 ```
 
-`npm run wiki:build` fails if any English string is missing its Hebrew translation, or if a build guide names a skill, item or set that no longer exists. GitHub Pages runs it on every push to `main`.
+`npm run wiki:build` fails if any English string is missing its Hebrew translation, or if a build guide names a skill, item or set that no longer exists.
 
-`"Aetheria Chronicles.exe" --selftest` plays about 10 seconds of scripted input, measures FPS, collects console errors and then exits.
+`"Aetheria Chronicles.exe" --selftest` plays about 10 seconds of scripted input, measures FPS, collects console errors and then exits. Add `--gfx=<preset>` to test one preset, or `--trace` to also record a Chromium trace to `saves/selftest-trace.json`.
+
+Pushing to `main` builds the game and the codex and publishes both to GitHub Pages: the game at the site root, the codex under `/wiki/`.
 
 **Tech stack:**
 
-- TypeScript 5, Vite 6, Canvas 2D (offscreen chunk caches, no `shadowBlur`) and Web Audio
+- TypeScript 5, Vite 6 and Web Audio
+- three.js 0.187 (WebGL 2) with `postprocessing` and `n8ao` for the 3D renderer; every mesh, material and texture is generated in code
+- Canvas 2D for the HUD and the Classic 2D renderer (offscreen chunk caches, no `shadowBlur`)
 - Electron 39 with a sandboxed preload bridge for disk saves and window controls
 - electron-builder 26
 - No native modules
@@ -152,7 +198,8 @@ npm run wiki:serve      # preview the codex at http://127.0.0.1:4180/
 | `src/systems` | Combat, feel, reactions, powers, events, saves |
 | `src/entities` | Player, monsters, companions, adventurers, breakables, pets |
 | `src/world` | Map generation and collision with elevation |
-| `src/render` | Renderer, paper-doll, terrain, HUD |
+| `src/gfx` | The 3D renderer: engine, terrain, water, foliage, props, characters, creatures, effects, post-processing, presets |
+| `src/render` | Classic 2D renderer, paper-doll, HUD, icons |
 | `src/ui` | Menus |
 | `src/platform` | Desktop bridge and self-test |
 | `electron/` | Main and preload |
@@ -168,18 +215,57 @@ License: MIT.
 
 ## עברית
 
-# כרוניקות אתריה: חרב ונפחייה — מהדורת Full-Dive למחשב
+# כרוניקות אתריה: חרב ונפחייה — מהדורת Ascension (גרסה 4.0)
 
-**משחק תפקידים ופעולה עצמאי ל-Windows.** קרב בזמן אמת במבט עילי אלכסוני ב-60 פריימים לשנייה, שרשראות Skill Connect, פיזיקת הטחה בקיר, שש תגובות יסודיות, נשקים ייחודיים, סטים של שריון, קודקס שרידים, חבורה של שניים ופשיטות של 6 גיבורים, הרפתקנים מדומים, בהמות רכיבה, חיות מחמד, דיג, נפחות עמוקה, בתים ותהום אינסופית. כל מה שרואים ושומעים נוצר באופן פרוצדורלי — אין במשחק קובצי תמונה או שמע.
+**משחק תפקידים ופעולה תלת־ממדי בזמן אמת, שרץ בדפדפן וגם כאפליקציית Windows עצמאית.** שרשראות Skill Connect, פיזיקת הטחה בקיר, שש תגובות יסודיות, נשקים ייחודיים, סטים של שריון, קודקס שרידים, חבורה של שניים ופשיטות של 6 גיבורים, הרפתקנים מדומים, בהמות רכיבה, חיות מחמד, דיג, נפחות עמוקה, בתים ותהום אינסופית. כל מה שרואים ושומעים נוצר באופן פרוצדורלי — אין במשחק קובצי תמונה, מודלים או שמע.
 
-**קודקס ומאגר המידע של אתריה (עברית / English):** https://nirco99.github.io/aetheria-chronicles-rpg/
+- **לשחק בדפדפן:** https://nirco99.github.io/aetheria-chronicles-rpg/
+- **קודקס ומאגר המידע של אתריה (עברית / English):** https://nirco99.github.io/aetheria-chronicles-rpg/wiki/
 
-הקודקס הוא החלק היחיד של הפרויקט שנמצא ברשת. המשחק עצמו הוא אפליקציית מחשב, וכפתור הוויקי במשחק פותח את הקודקס בדפדפן ברירת המחדל (עותק לא-מקוון מצורף לאפליקציה). כל מספר בקודקס נוצר מתוך `src/data` של המשחק, וכל דמות מצוירת על ידי מנוע הציור של המשחק עצמו.
+כל מספר בקודקס נוצר מתוך `src/data` של המשחק. עותק לא-מקוון שלו מצורף לאפליקציית המחשב.
+
+### מה חדש בגרסה 4.0: מהדורת Ascension
+
+למשחק יש עכשיו מנוע תלת־ממד אמיתי. הסימולציה, התוכן והשמירות לא השתנו; מה שרואים על המסך חדש לגמרי.
+
+- **עולם תלת־ממדי.** שטח מפוסל עם רמות, צוקים ומדרגות, חומרי קרקע שמתמזגים זה בזה, חומות עיר ומבוכים בנפח מלא, בתים עם קורות עץ וחלונות שנדלקים בלילה, ואביזרים, רהיטים, עצים, סלעים ופרחים בתלת־ממד.
+- **דמויות ויצורים בתלת־ממד.** שלדים פרוצדורליים לצולל, לבני הלוויה, להרפתקנים, לדמויות העיר, לכל 16 משפחות היצורים, לבהמות הרכיבה ולחיות המחמד — עם גפיים בקינמטיקה הפוכה, שובלי להב, הבזקי פגיעה והתפוגגות בהופעה ובמוות.
+- **תאורה.** שמש וירח שעוקבים אחרי השעון, צללים רכים שמותאמים למצלמה, תאורת שמיים, עד 24 מקורות אור דינמיים לפנסים, לפידים, לחשים ושלל, וקרני אור נפחיות דרך צמרות העצים.
+- **מים, לבה ומזג אוויר.** קצף על קו החוף, גוון עומק ונצנוצי שמש; לבה זוהרת; גשם, שלג, אפר, פריחה, גחליליות ואדמה רטובה.
+- **דשא.** עד 120 גבעולים למשבצת, מצוירים על כרטיס המסך, שמתנדנדים ברוח ומפנים דרך לכל דמות.
+- **מצלמה ותמונה.** עומק שדה, זוהר, הצללת סביבה, מיפוי גוונים קולנועי ודירוג צבע לכל ממלכה, עם סיבוב מצלמה קולנועי במסך הפתיחה.
+- **ממשק.** תצוגה עילית שצוירה מחדש (לוח חיוניות עם מדליון רמה, מדים מבריקים, סרגל כישורים עם מקשים), מסך פתיחה חדש ועיצוב תפריטים חדש.
+- **משחק בדפדפן.** גרסת הרשת היא המשחק עצמו; הקודקס עבר לכתובת `/wiki/`.
+
+תיקון שהגיע עם הגרסה:
+
+- הריגות שהרפתקנים מדומים מבצעים רחוק מכם כבר לא נותנות לכם ניסיון, שלל או קרדיט לפרסים. עדיין מקבלים קרדיט על הריגות שלכם ושל החבורה, על הריגות שסייעתם בהן או שעמדתם לידן, ועל כל בוס.
+
+#### פריסטים גרפיים
+
+ב**הגדרות ← גרפיקה** מחליפים פריסט בזמן אמת. `Auto` בוחר פריסט לפי כרטיס המסך.
+
+| פריסט | למי | מה הוא מפעיל |
+| --- | --- | --- |
+| **Cinematic 4K** | כרטיסי המסך החזקים ביותר, צילומי מסך | כל מה שב-RTX Ultra ברזולוציה של עד 4K, אור נפחי ב-40 צעדים, 120 גבעולי דשא למשבצת |
+| **RTX Ultra** | RTX 4060 ומעלה (נבחר שם אוטומטית) | החלקת קצוות ‎4× MSAA, מפות צל ב-4K, הצללת סביבה ברזולוציה מלאה, אור נפחי ב-26 צעדים, עומק שדה עם בוקה, 20 אורות דינמיים, 84 גבעולי דשא למשבצת |
+| **High** | כרטיסי מסך בינוניים | אור נפחי, עומק שדה עם בוקה, 12 אורות דינמיים |
+| **Balanced** | כרטיסי גיימינג בסיסיים | הצללת סביבה, מיקוד Tilt-Shift, דשא צפוף יותר |
+| **Laptop** | גרפיקה מובנית | העולם התלת־ממדי עם צללי שמש וזוהר, ברזולוציה מופחתת |
+| **Classic 2D** | כל מחשב | מנוע הקנבס המקורי של גרסה 3 |
+
+במדידה על לפטופ עם Intel Iris Xe, הבדיקה העצמית של אפליקציית המחשב מחזיקה 60 פריימים יציבים בפריסט **Laptop** (ממוצע של כ-54, כולל העצירות החד־פעמיות כשחלון נפתח בפעם הראשונה). **RTX Ultra** ו-**Cinematic 4K** נבנו לכרטיס ברמת RTX 4060 ומצוירים נכון, אבל עדיין לא נמדדו על כרטיס כזה. אם פריסט כבד מדי למחשב שלכם, רדו שורה אחת.
+
+כדי לכפות פריסט להרצה אחת: `"Aetheria Chronicles.exe" --gfx=ultra`, או הוסיפו `?gfx=ultra` לכתובת בדפדפן. הערכים הם `classic`, `low`, `medium`, `high`, `ultra` ו-`cinematic`.
+
+### איך משחקים בדפדפן
+
+פתחו את https://nirco99.github.io/aetheria-chronicles-rpg/ ב-Chrome, Edge או Firefox עדכניים במחשב נייח או נייד. נדרשים WebGL 2, מקלדת ועכבר. השמירות נשארות באחסון המקומי של אותו דפדפן. במחשב עם כרטיס מסך ייעודי, ודאו שהדפדפן משתמש בו (ב-Windows: *הגדרות ← מערכת ← תצוגה ← גרפיקה*).
 
 ### איך משחקים ב-Windows
 
 1. הורידו או שכפלו את המאגר.
-2. לחצו פעמיים על **`Launch-Aetheria-Desktop.bat`**. בפעם הראשונה הוא בונה את `release\win-unpacked\Aetheria Chronicles.exe` (נדרש [Node.js 20 ומעלה](https://nodejs.org)), ומאז הוא מפעיל את קובץ ההפעלה ישירות.
+2. לחצו פעמיים על **`Launch-Aetheria-Desktop.bat`**. בפעם הראשונה, ושוב בכל פעם שמושכים גרסה חדשה, הוא בונה את `release\win-unpacked\Aetheria Chronicles.exe` (נדרש [Node.js 20 ומעלה](https://nodejs.org)); אחרת הוא מפעיל את קובץ ההפעלה ישירות. פרמטרים מועברים הלאה, כך ש-`Launch-Aetheria-Desktop.bat --gfx=ultra` עובד.
 3. *(רשות)* קליק ימני על **`Create-Desktop-Shortcut.ps1`** ← **Run with PowerShell** יוצר סמל *Aetheria Chronicles* על שולחן העבודה. הוסיפו `-StartMenu` כדי ליצור גם קיצור בתפריט התחל.
 
 ### שמירות, תצוגה ויציאה
@@ -192,7 +278,8 @@ License: MIT.
 - **פתיחת תיקיית השמירות** (במסך הפתיחה, בתפריט ההשהיה או בהגדרות) פותחת את התיקייה בסייר הקבצים.
 - **F11 / Alt+Enter** עוברים למסך מלא. ב**הגדרות ← תצוגה** יש:
   - גדלי חלון: 1280×720, 1600×900, 1920×1080 ו-2560×1440
-  - איכות רינדור: דגימת-על מ-0.75× עד 2× מעל קנה המידה של Windows
+  - איכות רינדור: דגימת-על מ-0.75× עד 2× מעל קנה המידה של Windows (ב-Classic 2D בלבד; הפריסטים התלת־ממדיים מנהלים את הרזולוציה בעצמם)
+- במחשב שיש בו גם גרפיקה מובנית וגם כרטיס מסך ייעודי, האפליקציה מבקשת מ-Windows את הכרטיס הייעודי.
 - **יציאה לשולחן העבודה** נמצאת במסך הפתיחה ובתפריט ההשהיה.
 
 ### מה חדש בגרסה 3.1: קודקס אתריה

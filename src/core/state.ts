@@ -7,7 +7,7 @@ import type { Player } from '../entities/player';
 import type { Input } from '../engine/input';
 import type { UI } from '../ui/ui';
 
-export const DEFAULT_SETTINGS: Settings = { master: 0.8, music: 0.5, sfx: 0.8, shake: true, numbers: true, fps: false, fullscreen: false, resolution: '1440x860', quality: 1, styleMeter: true };
+export const DEFAULT_SETTINGS: Settings = { master: 0.8, music: 0.5, sfx: 0.8, shake: true, numbers: true, fps: false, fullscreen: false, resolution: '1440x860', quality: 1, styleMeter: true, gfx: 'auto' };
 
 export const G = {
   game: null as unknown as Game,

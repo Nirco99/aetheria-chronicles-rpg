@@ -203,7 +203,7 @@ export function buildDataset() {
   const monsters = Object.values(MONSTERS).map(monsterEntry);
 
   return {
-    version: '3.1.0',
+    version: '4.0.0',
     meta: {
       maxLevel: MAX_LEVEL,
       maxRank: MAX_RANK,

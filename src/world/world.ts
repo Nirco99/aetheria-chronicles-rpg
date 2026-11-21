@@ -560,12 +560,12 @@ export class World {
 
   // ---------------------------------------------------------------- events
 
-  onMonsterKilled(m: Monster): void {
+  onMonsterKilled(m: Monster, credit = true): void {
     if (m.zone) {
       m.zone.alive = Math.max(0, m.zone.alive - 1);
       m.zone.timer = m.zone.respawn;
     }
-    onKillBounty(m.def.id);
+    if (credit) onKillBounty(m.def.id);
     if (m === this.eliteAlive) {
       this.eliteAlive = null;
       G.save.elitesSlain.push(this.eliteKey());

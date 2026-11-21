@@ -11,9 +11,11 @@ interface Particle {
   x: number; y: number; z: number; vx: number; vy: number; vz: number;
   life: number; max: number; size: number; color: string; kind: PKind; drag: number; grav: number; add: boolean;
 }
-interface Ribbon {
+export interface Ribbon {
   xs: Float32Array; ys: Float32Array; nx: Float32Array; ny: Float32Array; wp: Float32Array;
   color: string; color2: string; t: number; life: number; w: number;
+  /** origin and vertical squash of the 2D projection, so the 3D renderer can lay the arc flat */
+  cy: number; sq: number;
 }
 interface DmgNum {
   x: number; y: number; z: number; vx: number; vz: number; text: string; color: string; size: number; t: number; life: number; bounces: number;
@@ -165,7 +167,7 @@ class FX {
       nx[i] = -ty;
       ny[i] = tx;
     }
-    this.ribbons.push({ xs, ys, nx, ny, wp, color: r.color ?? color, color2: r.color2 ?? color2, t: 0, life: 0.24, w: r.w ?? 14 });
+    this.ribbons.push({ xs, ys, nx, ny, wp, color: r.color ?? color, color2: r.color2 ?? color2, t: 0, life: 0.24, w: r.w ?? 14, cy, sq: style === 'thrust' ? 0.85 : 0.82 });
   }
 
   number(x: number, y: number, text: string, color: string, size = 15): void {
@@ -440,8 +442,8 @@ class FX {
 
   // ---------------------------------------------------------------- draw (screen space)
 
-  drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-    if (this.flashA > 0.01) {
+  drawScreen(ctx: CanvasRenderingContext2D, w: number, h: number, noFlash = false): void {
+    if (this.flashA > 0.01 && !noFlash) {
       ctx.globalAlpha = this.flashA;
       ctx.fillStyle = this.flashColor;
       ctx.fillRect(0, 0, w, h);

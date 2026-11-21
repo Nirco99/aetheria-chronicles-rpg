@@ -24,7 +24,7 @@ import { genCity, genDungeon, genWild } from '../src/world/mapgen';
 import { SOL, type GameMap } from '../src/world/tilemap';
 import { hash2 } from '../src/engine/util';
 
-export const version = '3.1.0';
+export const version = '4.0.0';
 
 setIconScale(4);
 

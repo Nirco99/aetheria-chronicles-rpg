@@ -1,7 +1,7 @@
 {
   "name": "aetheria-chronicles-rpg",
   "productName": "Aetheria Chronicles",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "description": "Aetheria Chronicles: Sword & Forge - Full-Dive Desktop Edition. A standalone 60 FPS top-down oblique action RPG for Windows with Skill Connect combat, Wall-Slam physics, elemental reactions, a Relic Codex, simulated adventurers and 6-hero raids.",
   "private": true,
   "type": "module",
@@ -18,10 +18,11 @@
     "electron": "electron .",
     "start": "npm run build && electron .",
     "selftest": "npm run build && electron . --selftest",
-    "pack:win": "npm run icon && npm run wiki:build && electron-builder --win --dir",
-    "dist:win": "npm run icon && npm run wiki:build && npm run build && electron-builder --win --dir"
+    "pack:win": "npm run icon && npm run wiki:build && node scripts/pack-win.mjs",
+    "dist:win": "npm run icon && npm run wiki:build && npm run build && node scripts/pack-win.mjs"
   },
   "devDependencies": {
+    "@types/three": "^0.187.0",
     "concurrently": "^9.2.5",
     "electron": "^39.8.10",
     "electron-builder": "^26.18.0",
@@ -66,5 +67,10 @@
       "icon": "build/icon.ico",
       "executableName": "Aetheria Chronicles"
     }
+  },
+  "dependencies": {
+    "n8ao": "^2.1.0",
+    "postprocessing": "^6.39.6",
+    "three": "^0.187.0"
   }
 }

@@ -4,19 +4,27 @@
 //  - F11 / Alt+Enter fullscreen, resolution presets, Quit to Desktop, Open Saves Folder
 //  - the bilingual strategy wiki is the only website: it opens in the OS browser
 //  - `--dev` loads the Vite dev server, `--selftest` runs an automated smoke test and exits
-const { app, BrowserWindow, Menu, ipcMain, net, screen, shell } = require('electron');
+//  - `--gfx=<classic|low|medium|high|ultra|cinematic>` forces a graphics preset for this run
+//  - `--selftest --trace` also records a Chromium trace of the run to saves/selftest-trace.json
+const { app, BrowserWindow, Menu, contentTracing, ipcMain, net, screen, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 
 const isDev = process.argv.includes('--dev');
 const isSelftest = process.argv.includes('--selftest');
+const GFX_PRESETS = ['classic', 'low', 'medium', 'high', 'ultra', 'cinematic', 'auto'];
+const gfxArg = (process.argv.find((a) => a.startsWith('--gfx=')) || '').slice(6).toLowerCase();
+const forcedGfx = GFX_PRESETS.includes(gfxArg) ? gfxArg : '';
+const isTrace = isSelftest && process.argv.includes('--trace');
 const DEV_URL = 'http://127.0.0.1:5173';
-const WIKI_URL = 'https://nirco99.github.io/aetheria-chronicles-rpg/';
+const WIKI_URL = 'https://nirco99.github.io/aetheria-chronicles-rpg/wiki/';
 const TITLEBAR_H = 32;
 const SAFE_NAME = /^[a-z0-9_-]{1,48}\.json$/i;
 
 app.setName('Aetheria Chronicles');
+// The 3D renderer wants the discrete GPU on machines that have both an integrated and a dedicated one.
+app.commandLine.appendSwitch('force_high_performance_gpu');
 if (process.platform === 'win32') app.setAppUserModelId('com.aetheria.chronicles');
 
 // ------------------------------------------------------------------ saves on disk
@@ -160,11 +168,13 @@ ipcMain.on('selftest:report', (e, json) => {
     report = { parseError: true };
   }
   writeSelftest(report);
+  const trace = isTrace ? contentTracing.stopRecording(path.join(SAVES, 'selftest-trace.json')).catch(() => undefined) : Promise.resolve();
   // keep a capture of the final frame next to the report for visual verification
   e.sender
     .capturePage()
     .then((img) => fs.writeFileSync(path.join(SAVES, 'selftest-capture.png'), img.toPNG()))
     .catch(() => undefined)
+    .then(() => trace)
     .finally(() => setTimeout(() => app.quit(), 250));
 });
 
@@ -242,8 +252,9 @@ function createWindow() {
     }, 60000);
   }
 
-  if (isDev) win.loadURL(DEV_URL);
-  else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  const query = forcedGfx ? { gfx: forcedGfx } : undefined;
+  if (isDev) win.loadURL(DEV_URL + (forcedGfx ? `/?gfx=${forcedGfx}` : ''));
+  else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), query ? { query } : undefined);
 }
 
 Menu.setApplicationMenu(null);
@@ -259,8 +270,13 @@ if (!gotLock) {
       w.focus();
     }
   });
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     SAVES = resolveSavesDir();
+    if (isTrace) {
+      await contentTracing
+        .startRecording({ included_categories: ['toplevel', 'devtools.timeline', 'blink', 'cc', 'gpu', 'viz', 'v8', 'loading', 'ipc', 'mojom', 'audio', 'media', 'fonts'] })
+        .catch(() => undefined);
+    }
     createWindow();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
